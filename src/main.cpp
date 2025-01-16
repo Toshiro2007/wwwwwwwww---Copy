@@ -168,7 +168,7 @@ ASSET(example_txt); // '.' replaced with "_" to make c++ happy
  * from where it left off.
  */
 void autonomous() {
-    chassis.turnToHeading(90, 1000, {.direction = AngularDirection::CW_CLOCKWISE, .minSpeed = 100});
+    chassis.turnToHeading(90, 167, {.direction = AngularDirection::CW_CLOCKWISE, .minSpeed = 100});
     pros::lcd::print(4, "pure pursuit finished!");
 }
 /**
