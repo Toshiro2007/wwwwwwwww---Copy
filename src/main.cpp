@@ -11,6 +11,8 @@ int righttpistonnumber = 0;
 #include "pros/motors.hpp"
 #include "pros/rtos.hpp"
 #include "pros/apix.h"
+bool reversing = false;    // Track if the motor is currently reversing
+bool spin_up_grace = true; // Grace period flag to allow for "spooling", when the motor starts spinning the first time
 
 int lefttpistonnumber = 0;
 int mobilegoalnumber = 0;
@@ -219,22 +221,44 @@ const int reverse_speed = -600;
  * @param param Pointer to additional data passed to the task (not used here, can be nullptr).
  */
 
-void intake_monitor_task(void* param) {
-    while (true) {
+void intake_monitor_task_function(void *param)
+{
+    bool reversing = false;    // Track if the motor is currently reversing
+    bool spin_up_grace = true; // Grace period flag to allow for "spooling", when the motor starts spinning the first time
+
+    while (true)
+    {
         // Get the current velocity of the intake motor
         double current_velocity = intake.get_actual_velocity();
+
+        // Allow a grace period for spin-up after the motor starts
+        if (spin_up_grace)
+        {
+            pros::delay(200);      // 200ms delay for spin-up
+            spin_up_grace = false; // Disable grace period after initial delay
+            continue;              // Skip the stuck check during grace period
+        }
+
         // Check if the intake motor is stuck
-        if (abs(current_velocity) < velocity_threshold && intake.get_target_velocity() != 0) {
+        if (!reversing && abs(current_velocity) < velocity_threshold && intake.get_target_velocity() != 0)
+        {
             // Log a message to the LCD for debugging purposes
             pros::lcd::print(0, "Intake stuck! Reversing...");
-            pros::lcd::print(2, "intake:%2f:",intake.get_actual_velocity());
+            pros::lcd::print(2, "Current velocity: %.2f", current_velocity);
 
-            // Reverse the intake mo`tor to resolve the stall
+            // Reverse the intake motor to resolve the stall
+            reversing = true; // Set reversing flag to avoid repeated reversals
             intake.move_relative(-reverse_degrees, reverse_speed);
 
+            // Wait for the reverse motion to complete
+            while (abs(intake.get_actual_velocity()) > 1)
+            {
+                pros::delay(10);
+            }
 
-            // Resume normal intake operation by setting the desired velocity
+            // Resume normal intake operation
             intake.move_velocity(desired_velocity);
+            reversing = false; // Reset the reversing flag
         }
 
         // Delay to reduce CPU usage of the task
@@ -362,7 +386,8 @@ void colorSortTask(void* param)
  * @brief Main operator control function.
  */
 void opcontrol() {
-	pros::lcd::print(1, "intake:%2f:",intake.get_actual_velocity());
+
+	pros::lcd::print(4, "intake:%2f:",intake.get_actual_velocity());
 	pros::lcd::print(0, "intake:%2f:",intake.get_actual_velocity());
 
 	pros::Controller master(pros::E_CONTROLLER_MASTER);
@@ -375,10 +400,10 @@ void opcontrol() {
 	pros::adi::DigitalOut intakeraiser('E');
 
     
+
 	
-	
-	pros::Task intake_monitor(intake_monitor_task, nullptr, "Intake Monitor Task");
-   
+    pros::Task *intake_monitor_task = nullptr; // Pointer to the intake monitoring task
+
    
 
    	// Start the color sorting task
@@ -386,6 +411,48 @@ void opcontrol() {
     pros::Task colorSort(colorSortTask, nullptr, "Intake Monitor Task");
 
 	while (true) {
+
+
+
+
+	// Check if the R1 button on the controller is pressed
+	if (master.get_digital(DIGITAL_R1))
+	{
+		// Run the intake motor at the desired velocity
+		intake.move_velocity(desired_velocity);
+
+		// Start the intake monitoring task if not already running
+		if (intake_monitor_task == nullptr)
+		{
+			intake_monitor_task = new pros::Task(intake_monitor_task_function, nullptr, "Intake Monitor Task");
+		}
+	}
+	else
+	{
+		// Stop the intake motor
+		intake.move_velocity(0);
+
+		// Stop and destroy the intake monitoring task if running
+		if (intake_monitor_task != nullptr)
+		{
+			intake_monitor_task->remove(); // Stop the task
+			delete intake_monitor_task;    // Free the allocated memory
+			intake_monitor_task = nullptr;
+		}
+	}
+
+
+
+
+
+
+
+
+
+
+
+
+
 	// get joystick positions
 	int leftY = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
 	int rightY = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_Y);
@@ -474,7 +541,7 @@ void opcontrol() {
 			target =19300;
 	}	
 	else if (master.get_digital(DIGITAL_L2)) {
-			target =7140;
+			target =7142;
 
 	}	
 	else if (master.get_digital(DIGITAL_DOWN)) {
@@ -487,8 +554,8 @@ void opcontrol() {
 	else{
 			target =4400;
 	}
-	float kP= 0.01;
-	float kD= 0.03;
+	float kP= 0.03;
+	float kD= 0.04;
 	int distance = target - armrotationsensor.get_angle();
 	int derivative = distance - prevdistance;
 	int armmovespeed = distance*kP+kD*derivative;
