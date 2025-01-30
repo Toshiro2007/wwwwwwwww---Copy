@@ -31,7 +31,7 @@ pros::MotorGroup left_motors({-1, -2, 3}, pros::MotorGearset::blue); // left mot
 pros::MotorGroup right_motors({11, 12, -13}, pros::MotorGearset::blue); // left motors use 600 RPM cartridges
 
 // Inertial Sensor on port 10
-pros::Imu imu(-4);
+pros::Imu imu(4);
 pros::Rotation armrotationsensor(16);
 
 
@@ -168,19 +168,8 @@ ASSET(example_txt); // '.' replaced with "_" to make c++ happy
  * from where it left off.
  */
 void autonomous() {
-pros::adi::DigitalOut mobilegoal('A');
-mobilegoal.set_value(true);
-chassis.moveToPoint(0, -20, 405,{.forwards=false});
-pros::delay(1000);      // 200ms delay for spin-up
-mobilegoal.set_value(false);
-pros::delay(1000);      // 200ms delay for spin-up
 
-
-intake.move_velocity(600); // This is 600 because it's a 600rpm motor
-pros::delay(750);      // 200ms delay for spin-up
-
-chassis.turnToHeading(90, 237, {.direction = AngularDirection::CW_CLOCKWISE, .minSpeed = 100});
-chassis.moveToPoint(0, 20, 375,{.forwards=true});
+chassis.turnToHeading(90, 1000);
 
     pros::lcd::print(4, "pure pursuit finished!");
 }
