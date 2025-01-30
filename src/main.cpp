@@ -123,6 +123,8 @@ void on_center_button() {
  * to keep execution time for this mode under a few seconds.
  */
 void initialize() {
+	chassis.calibrate();
+
 	pros::lcd::initialize();
 	pros::lcd::set_text(1, "Hello PROS User!");
 
@@ -168,7 +170,6 @@ ASSET(example_txt); // '.' replaced with "_" to make c++ happy
  * from where it left off.
  */
 void autonomous() {
-
 chassis.turnToHeading(90, 1000);
 
     pros::lcd::print(4, "pure pursuit finished!");
