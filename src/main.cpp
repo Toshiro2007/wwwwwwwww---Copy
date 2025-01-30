@@ -23,15 +23,15 @@ int target = 0;
 // controller
 // controller
 pros::Controller master (CONTROLLER_MASTER);
-pros::Motor intake (19, pros::MotorGearset::blue);
-pros::MotorGroup armmotorgroup ({17, -18}, pros::MotorGearset::green);
+pros::MotorGroup intake ({19, 18}, pros::MotorGearset::blue);
+pros::Motor armmotorgroup (17, pros::MotorGearset::green);
 
-// motor groups
+// motor groupss
 pros::MotorGroup left_motors({-1, -2, 3}, pros::MotorGearset::blue); // left motors use 600 RPM cartridges
 pros::MotorGroup right_motors({11, 12, -13}, pros::MotorGearset::blue); // left motors use 600 RPM cartridges
 
 // Inertial Sensor on port 10
-pros::Imu imu(4);
+pros::Imu imu(-4);
 pros::Rotation armrotationsensor(16);
 
 
@@ -168,7 +168,20 @@ ASSET(example_txt); // '.' replaced with "_" to make c++ happy
  * from where it left off.
  */
 void autonomous() {
-    chassis.turnToHeading(90, 167, {.direction = AngularDirection::CW_CLOCKWISE, .minSpeed = 100});
+pros::adi::DigitalOut mobilegoal('A');
+mobilegoal.set_value(true);
+chassis.moveToPoint(0, -20, 405,{.forwards=false});
+pros::delay(1000);      // 200ms delay for spin-up
+mobilegoal.set_value(false);
+pros::delay(1000);      // 200ms delay for spin-up
+
+
+intake.move_velocity(600); // This is 600 because it's a 600rpm motor
+pros::delay(750);      // 200ms delay for spin-up
+
+chassis.turnToHeading(90, 237, {.direction = AngularDirection::CW_CLOCKWISE, .minSpeed = 100});
+chassis.moveToPoint(0, 20, 375,{.forwards=true});
+
     pros::lcd::print(4, "pure pursuit finished!");
 }
 /**
@@ -391,8 +404,6 @@ void opcontrol() {
 	pros::lcd::print(0, "intake:%2f:",intake.get_actual_velocity());
 
 	pros::Controller master(pros::E_CONTROLLER_MASTER);
-	pros::MotorGroup left_mg({1, 2, -4});    // Creates a motor group with forwards ports 1 & 3 and reversed port 2
-	pros::MotorGroup right_mg({3, -5, 6});  // Creates a motor group with forwards port 5 and reversed ports 4 & 6
 	pros::adi::DigitalOut righttpiston('C');
 	pros::adi::DigitalOut lefttpiston('B');
 	pros::adi::DigitalOut mobilegoal('A');
@@ -538,24 +549,24 @@ void opcontrol() {
 
 
 	if (master.get_digital(DIGITAL_L1)) {
-			target =19300;
+			target =18500;
 	}	
 	else if (master.get_digital(DIGITAL_L2)) {
-			target =7142;
+			target =6700;
 
 	}	
 	else if (master.get_digital(DIGITAL_DOWN)) {
 			target =10000;
 	}	
 	else if (master.get_digital(DIGITAL_LEFT)) {
-			target =18500;
+			target =17500;
 	}	
 
 	else{
-			target =4400;
+			target =3900;
 	}
-	float kP= 0.03;
-	float kD= 0.04;
+	float kP= 0.02;
+	float kD= 0.03;
 	int distance = target - armrotationsensor.get_angle();
 	int derivative = distance - prevdistance;
 	int armmovespeed = distance*kP+kD*derivative;
