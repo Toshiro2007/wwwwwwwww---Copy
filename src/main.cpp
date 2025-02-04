@@ -1,4 +1,5 @@
 #include "main.h"
+#include "lemlib/chassis/trackingWheel.hpp"
 #include "pros/optical.hpp"
 #include <algorithm>
 int righttpistonnumber = 0;
@@ -37,13 +38,22 @@ pros::Rotation armrotationsensor(16);
 
 pros::Optical colorSortSensor(7);
 
+// tracking wheels
+// horizontal tracking wheel encoder. Rotation sensor, port 20, not reversed
+pros::Rotation horizontalEnc(-4);
+// vertical tracking wheel encoder. Rotation sensor, port 11, reversed
+pros::Rotation verticalEnc(-6);
+// horizontal tracking wheel. 2.75" diameter, 5.75" offset, back of the robot (negative)
+lemlib::TrackingWheel horizontal(&horizontalEnc, lemlib::Omniwheel::NEW_2, .591);
+// vertical tracking wheel. 2.75" diameter, 2.5" offset, left of the robot (negative)
+lemlib::TrackingWheel vertical(&verticalEnc, lemlib::Omniwheel::NEW_2, 0.75);
 
 
 
 // drivetrain settings
 lemlib::Drivetrain drivetrain(&left_motors, // left motor group
                               &right_motors, // right motor group
-                              11.5, // 12 inch track width
+                              11, // 12 inch track width
                               lemlib::Omniwheel::NEW_275, // using new 4" omnis
                               450, // drivetrain rpm is 360
                               2 // horizontal drift is 2 (for now)
@@ -78,9 +88,9 @@ lemlib::ControllerSettings angularController(2, // proportional gain (kP)
 );
 
 // sensors for odometry
-lemlib::OdomSensors sensors(nullptr, // vertical tracking wheel 1, set to nullptr as we are using IMEs
-                            nullptr, // vertical tracking wheel 2, set to nullptr as we are using IMEs
-                            nullptr, // horizontal tracking wheel 1
+lemlib::OdomSensors sensors(&vertical, // vertical tracking wheel
+                            nullptr, // vertical tracking wheel 2, set to nullptr as we don't have a second one
+                            &horizontal, // horizontal tracking wheel
                             nullptr, // horizontal tracking wheel 2, set to nullptr as we don't have a second one
                             &imu // inertial sensor
 );
@@ -170,7 +180,24 @@ ASSET(example_txt); // '.' replaced with "_" to make c++ happy
  * from where it left off.
  */
 void autonomous() {
-chassis.turnToHeading(90, 1000);
+	pros::adi::DigitalOut mobilegoal('A');
+
+    chassis.setPose(51, -58, 90);
+    chassis.moveToPoint(23.5, -58, 1000, {.forwards = false, .maxSpeed = 100, .minSpeed = 60, .earlyExitRange = 2});
+    chassis.turnToPoint(4, -48.5, 180, {.forwards = false});
+    chassis.moveToPoint(4, -48.5, 1450, {.forwards = false, .maxSpeed = 50});
+    chassis.waitUntilDone();
+    intake.move(127);
+    mobilegoal.set_value(true);
+    pros::delay(200); //delay for clamp
+    chassis.turnToPoint(4.5, -22, 700, {.forwards=false});
+    chassis.moveToPoint(4.5, -22, 1500, {.forwards=false});
+    pros::delay(700);
+    mobilegoal.set_value(false);
+    pros::delay(200);
+    chassis.moveToPoint(4.5, -30, 1500);
+    chassis.waitUntilDone();
+    chassis.turnToHeading(215, 1000);
 
     pros::lcd::print(4, "pure pursuit finished!");
 }
