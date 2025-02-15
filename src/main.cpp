@@ -2,12 +2,6 @@
 #include "lemlib/chassis/trackingWheel.hpp"
 #include "pros/optical.hpp"
 #include <algorithm>
-#include "lemlib-tarball/api.hpp"
-
-
-
-
-int righttpistonnumber = 0;
 #include "main.h"
 #include "lemlib/api.hpp" // IWYU pragma: keep
 #include "pros/misc.h"
@@ -19,27 +13,21 @@ int righttpistonnumber = 0;
 #include "pros/apix.h"
 
 
+int readyscoreposition = 0;
+int normalposition = 1;
 
 
 
 
 
-
-
-bool reversing = false;    // Track if the motor is currently reversing
-bool spin_up_grace = true; // Grace period flag to allow for "spooling", when the motor starts spinning the first time
-
-int lefttpistonnumber = 0;
-int mobilegoalnumber = 0;
-int intakeraisernumber = 0;
-int doinkernumber = 0;
 int prevdistance = 0;
 int target = 0;
 // controller
 // controller
 pros::Controller master (CONTROLLER_MASTER);
 pros::MotorGroup intake ({19, -18}, pros::MotorGearset::blue);
-pros::Motor armmotorgroup (17, pros::MotorGearset::green);
+pros::MotorGroup intakepreroller ({19, -18}, pros::MotorGearset::blue);
+pros::Motor armmotor (17, pros::MotorGearset::green);
 
 // motor groupss
 pros::MotorGroup left_motors({-1, -2, 3}, pros::MotorGearset::blue); // left motors use 600 RPM cartridges
@@ -52,15 +40,6 @@ pros::Rotation armrotationsensor(16);
 
 pros::Optical colorSortSensor(7);
 
-// tracking wheels
-// horizontal tracking wheel encoder. Rotation sensor, port 20, not reversed
-pros::Rotation horizontalEnc(-4);
-// vertical tracking wheel encoder. Rotation sensor, port 11, reversed
-pros::Rotation verticalEnc(-6);
-// horizontal tracking wheel. 2.75" diameter, 5.75" offset, back of the robot (negative)
-lemlib::TrackingWheel horizontal(&horizontalEnc, lemlib::Omniwheel::NEW_2, .591);
-// vertical tracking wheel. 2.75" diameter, 2.5" offset, left of the robot (negative)
-lemlib::TrackingWheel vertical(&verticalEnc, lemlib::Omniwheel::NEW_2, 0.75);
 
 
 
@@ -72,10 +51,6 @@ lemlib::Drivetrain drivetrain(&left_motors, // left motor group
                               450, // drivetrain rpm is 360
                               2 // horizontal drift is 2 (for now)
 );
-// create a v5 rotation sensor on port 4
-pros::Rotation horizontal_encoder(6);
-// horizontal tracking wheel
-lemlib::TrackingWheel horizontal_tracking_wheel(&horizontal_encoder, lemlib::Omniwheel::NEW_2, 0);
 
 // lateral motion controller
 lemlib::ControllerSettings linearController(10, // proportional gain (kP)
@@ -150,7 +125,6 @@ void initialize() {
 	chassis.calibrate();
 
 	pros::lcd::initialize();
-	pros::lcd::set_text(1, "Hello PROS User!");
 
 	pros::lcd::register_btn1_cb(on_center_button);
 }
@@ -177,6 +151,16 @@ void competition_initialize() {}
 // this needs to be put outside a function
 ASSET(example_txt); // '.' replaced with "_" to make c++ happy
 
+
+
+
+// Replace my_paths.txt with your actual filename
+// "." is replaced with "_" to overcome c++ limitations
+ASSET(Skillsauton1_txt);
+
+
+
+
 /**
  * Runs during auto
  *
@@ -193,181 +177,91 @@ ASSET(example_txt); // '.' replaced with "_" to make c++ happy
  * will be stopped. Re-enabling the robot will restart the task, not re-start it
  * from where it left off.
  */
+
 void autonomous() {
+	pros::adi::DigitalOut mobilegoalmech('A');
 
-pros::Motor armmotorgroup(17, pros::MotorGearset::green);
-pros::adi::DigitalOut mobilegoal('A');
-mobilegoal.set_value(true);
-intake.move(127);
+  // Set initial robot pose (x, y, heading), start intake, and release mobile goal
+  chassis.setPose(-60, 0, 90);
+  intake.move(127);
+  mobilegoalmech.set_value(true);
 
-int target = 12000;
-int distance = 10000;
-int prevdistance = distance;  // Initialize prevdistance before the loop
+  pros::delay(500);
 
-// Start loop to move the arm until it reaches the target
-while (distance > 500) {  // Continue until distance is less than or equal to 10
-    float kP = 0.02;
-    float kD = 0.03;
-    
-    distance = target - armrotationsensor.get_angle();  // Calculate the current distance from target
-    int derivative = distance - prevdistance;  // Calculate the difference in distance (derivative)
+  //Move to center and stop second stage
+  chassis.moveToPose(-48, 0, 180, 10000, {.maxSpeed = 75});
+  intake.move(0);
+  pros::delay(500);
+  
+  //Move to Goal 1
+  chassis.moveToPose(-48, 24, 180, 10000, {.forwards = false});
+  pros::delay(4000);
+  mobilegoalmech.set_value(false);
+  pros::delay(2000);
 
-    int armmovespeed = distance * kP + kD * derivative;  // Calculate motor speed using PD control
+  //Clamp and turn to face ring 1
+  chassis.turnToHeading(90, 10000, {.maxSpeed = 75});
 
-    armmotorgroup.move_velocity(armmovespeed);  // Set motor speed to move the arm
+  pros::delay(500);
 
-    prevdistance = distance;  // Update prevdistance for next iteration
-
-    pros::delay(2);  // Delay for motor response time
-}
-
-
-
-target =0;
-
-distance = 100;{
-while (distance < 10);			
-	float kP= 0.02;
-	float kD= 0.03;
-	distance = target - armrotationsensor.get_angle();
-	int derivative = distance - prevdistance;
-	int armmovespeed = distance*kP+kD*derivative;
-	armmotorgroup.move_velocity(armmovespeed);
-	int prevdistance = distance;
-	pros::delay(2);
-}
+  //start intake and pickup ring 1
+  intake.move(127);
+  chassis.moveToPose(-24, 24, 45, 10000, {.forwards = true, .maxSpeed = 75});
+  pros::delay(500);
 
 
+  //go to location to not hit ladder when picking up ring 2
+  chassis.moveToPose(0, 48, 45, 10000, {.maxSpeed = 75});
+  pros::delay(500);
 
-// Once the arm is in position (distance <= 10), set the chassis pose
 
-// Move the chassis to a specific point
+  //pickup ring 2
+  chassis.moveToPose(24, 48, 45, 10000, {.maxSpeed = 75});
+  pros::delay(500);
+
+
+  //turn to face ring 3, 4, and 5
+  chassis.turnToHeading(270, 10000, {.maxSpeed = 75});
+  pros::delay(500);
 
 
 
-chassis.moveToPoint(0, -11, 1000, {.forwards = false, .maxSpeed = 50, .minSpeed = 60, .earlyExitRange = 2});
-chassis.turnToHeading(90, 1000, {.maxSpeed = 50});
-chassis.moveToPoint(-22, -11, 1000, {.forwards = false, .maxSpeed = 50, .minSpeed = 60, .earlyExitRange = 2});
-pros::delay(1000);  // Delay for motor response time
-mobilegoal.set_value(false);
-pros::delay(1000);  // Delay for motor response time
-
-chassis.setPose(0, 0, 0);
-
-chassis.turnToHeading(90, 1000, {.maxSpeed = 50});
-chassis.setPose(0, 0, 0);
-pros::delay(1000);  // Delay for motor response time
-
-chassis.moveToPoint(20, 0, 1000, {.forwards = true, .maxSpeed = 50, .minSpeed = 60, .earlyExitRange = 2});
-pros::delay(1000);  // Delay for motor response time
-chassis.setPose(0, 0, 0);
-pros::delay(1000);  // Delay for motor response time
+  //pickup ring 3, 4, and 5
+  chassis.moveToPose(-58, 48, 270, 10000, {.maxSpeed = 50});
+  pros::delay(500);
 
 
-pros::delay(1000);  // Delay for motor response time
-
-chassis.turnToHeading(90, 1000, {.maxSpeed = 50});
-
-pros::delay(1000);  // Delay for motor response time
-
-chassis.setPose(0, 0, 0);
-
-pros::delay(1000);  // Delay for motor response time
+  //wall reset
+  chassis.moveToPose(-64, 48, 270, 10000, {.maxSpeed = 75});
+  pros::delay(500);
+  chassis.setPose(-62.5, 48, 270);
+  pros::delay(500);
 
 
-
-chassis.moveToPoint(0, 16, 2000, {.forwards = true, .maxSpeed = 50, .minSpeed = 60, .earlyExitRange = 2});
-
-pros::delay(3000);  // Delay for motor response time
-
-chassis.turnToHeading(90, 1000, {.maxSpeed = 50});
+  //back up off wall
+  chassis.moveToPose(-58, 48, 270, 10000, {.forwards = false, .maxSpeed = 75});
+  pros::delay(500);
 
 
-pros::delay(1000);  // Delay for motor response time
-chassis.setPose(0, 0, 0);
-pros::delay(1000);  // Delay for motor response time
+  //turn to align to corner
+  chassis.turnToHeading(45, 10000, {.maxSpeed = 75});
+  pros::delay(500);
 
-chassis.moveToPoint(0, 34, 3000, {.forwards = true, .maxSpeed = 50, .minSpeed = 60, .earlyExitRange = 2});
-pros::delay(1000);  // Delay for motor response time
-chassis.setPose(0, 0, 0);
-pros::delay(1000);  // Delay for motor response time
-chassis.setPose(0, 0, 0);
+  //align to corner
+  chassis.moveToPose(-48, 59, 270, 10000, {.forwards = true, .maxSpeed = 75});
+  pros::delay(500);
 
 
-pros::delay(1000);  // Delay for motor response time
-chassis.turnToHeading(135, 1000, {.maxSpeed = 50});
-
-pros::delay(1000);  // Delay for motor response time
-chassis.setPose(0, 0, 0);
-pros::delay(2000);  // Delay for motor response time
-
-mobilegoal.set_value(true);
-pros::delay(2000);  // Delay for motor response time
-
-chassis.moveToPoint(0, -16, 2000, {.forwards = false, .maxSpeed = 50, .minSpeed = 60, .earlyExitRange = 2});
-
-pros::delay(2000);  // Delay for motor response time
-
-chassis.moveToPoint(0, 25, 3000, {.forwards = true, .maxSpeed = 50, .minSpeed = 60, .earlyExitRange = 2});
-pros::delay(4000);  // Delay for motor response time
+  //move into corner
+  chassis.moveToPose(-57, 59, 270, 10000, {.forwards = false, .maxSpeed = 75});
+  pros::delay(500);
 
 
-chassis.setPose(0, 0, 0);
-chassis.turnToHeading(180, 4000, {.maxSpeed = 50});
+  //drop goal and reverse second stage of intake slowly
+  mobilegoalmech.set_value(true);
+  intake.move(-21);
+  pros::delay(500);
 
-pros::delay(5000);  // Delay for motor response time
-chassis.setPose(0, 0, 0);
-
-chassis.moveToPoint(0, -37, 2000, {.forwards = false, .maxSpeed = 50, .minSpeed = 60, .earlyExitRange = 2});
-pros::delay(2000);  // Delay for motor response time
-chassis.turnToHeading(90, 4000, {.maxSpeed = 50});
-chassis.moveToPoint(0, -13, 2000, {.forwards = false, .maxSpeed = 50, .minSpeed = 60, .earlyExitRange = 2});
-
-pros::delay(2000);  // Delay for motor response time
-mobilegoal.set_value(false);
-pros::delay(4000);  // Delay for motor response time
-
-chassis.setPose(0, 0, 0);
-chassis.turnToHeading(180, 4000, {.maxSpeed = 50});
-pros::delay(5000);  // Delay for motor response time
-
-chassis.setPose(0, 0, 0);
-chassis.moveToPoint(0, 20, 3000, {.forwards = true, .maxSpeed = 50, .minSpeed = 60, .earlyExitRange = 2});
-pros::delay(4000);  // Delay for motor response time
-chassis.setPose(0, 0, 0);
-
-chassis.turnToHeading(90, 1000, {.direction = AngularDirection::CW_CLOCKWISE, .minSpeed = 100});
-pros::delay(2000);  // Delay for motor response time
-chassis.setPose(0, 0, 0);
-chassis.moveToPoint(0, -12, 3000, {.forwards = false, .maxSpeed = 50, .minSpeed = 60, .earlyExitRange = 2});
-
-
-}
-/**
-
-
-
-	pros::adi::DigitalOut mobilegoal('A');
-    mobilegoal.set_value(true);
-
-    chassis.setPose(51, -58, 90);
-    chassis.moveToPoint(23.5, -58, 1000, {.forwards = false, .maxSpeed = 100, .minSpeed = 60, .earlyExitRange = 2});
-    chassis.turnToPoint(4, -48.5, 180, {.forwards = false});
-    chassis.moveToPoint(4, -48.5, 1450, {.forwards = false, .maxSpeed = 50});
-    chassis.waitUntilDone();
-    intake.move(127);
-    mobilegoal.set_value(false);
-    pros::delay(200); //delay for clamp
-    chassis.turnToPoint(4.5, -22, 700, {.forwards=false});
-    chassis.moveToPoint(4.5, -22, 1500, {.forwards=false});
-    pros::delay(700);
-    mobilegoal.set_value(true);
-    pros::delay(200);
-    chassis.moveToPoint(4.5, -30, 1500);
-    chassis.waitUntilDone();
-    chassis.turnToHeading(215, 1000);
-
-    pros::lcd::print(4, "pure pursuit finished!");
 }
 /**
  * Runs the operator control code. This function will be started in its own task
@@ -395,24 +289,18 @@ chassis.moveToPoint(0, -12, 3000, {.forwards = false, .maxSpeed = 50, .minSpeed 
  */
 void opcontrol() {
 
-	pros::lcd::print(4, "intake:%2f:",intake.get_actual_velocity());
-	pros::lcd::print(0, "intake:%2f:",intake.get_actual_velocity());
 
 	pros::Controller master(pros::E_CONTROLLER_MASTER);
-	pros::adi::DigitalOut righttpiston('C');
-	pros::adi::DigitalOut lefttpiston('B');
-	pros::adi::DigitalOut mobilegoal('A');
+	pros::adi::DigitalOut mobilegoalmech('A');
 	pros::adi::DigitalOut doinker('D');
 	pros::adi::DigitalOut intakeraiser('E');
 
     
 
 	
-    pros::Task *intake_monitor_task = nullptr; // Pointer to the intake monitoring task
 
    
 
-   	// Start the color sorting task
 
 
 	while (true) {
@@ -421,9 +309,6 @@ void opcontrol() {
 
 
 	// Check if the R1 button on the controller is pressed
-	if (master.get_digital(DIGITAL_R1))		
-        intake.move(127);
-
 
 
 
@@ -439,107 +324,67 @@ void opcontrol() {
 	// move the chassis with curvature drive
 	chassis.tank(leftY, rightY);
 
+    if (master.get_digital(DIGITAL_R1))	{
+        intake.move(127);
+        intakepreroller.move(127);
+    }
+
+    else if (master.get_digital(DIGITAL_A)) {
+            intake.move(-127);
+        intakepreroller.move(-127);
+
+    }
+    else
+		{
+        intake.move(0);
+        intakepreroller.move(0);
+		}
+
+
+
+
+
+
 	if (master.get_digital(DIGITAL_R2))
 		{
-		mobilegoal.set_value(true);
-		mobilegoalnumber = 0;
+		mobilegoalmech.set_value(true);
 		}
 	else
 		{
-		mobilegoal.set_value(false);
-		mobilegoalnumber = 1;
+		mobilegoalmech.set_value(false);
 		}
 		
 	
-	if (master.get_digital_new_press(DIGITAL_X)) {
-		if (doinkernumber == 0)
-			{
-			doinker.set_value(true);
-			doinkernumber = 1;
-			}
-		else
-		 	{
-			doinker.set_value(false);
-			doinkernumber = 0;
-			}
-		}
-
-	if (master.get_digital_new_press(DIGITAL_RIGHT)) {
-		if (lefttpistonnumber == 0)
-			{
-			lefttpiston.set_value(true);
-			lefttpistonnumber = 1;
-			}
-		else
-		 	{
-			lefttpiston.set_value(false);
-			lefttpistonnumber = 0;
-			}
-		}
-	if (master.get_digital_new_press(DIGITAL_B)) {
-		if (righttpistonnumber == 0)
-			{
-			righttpiston.set_value(true);
-			righttpistonnumber = 1;
-			}
-		else
-		 	{
-			righttpiston.set_value(false);
-			righttpistonnumber = 0;
-			}
-		}
-	if (master.get_digital_new_press(DIGITAL_UP)) {
-		if (intakeraisernumber == 0)
-			{
-			intakeraiser.set_value(true);
-			intakeraisernumber = 1;
-			}
-		else
-		 	{
-			intakeraiser.set_value(false);
-			intakeraisernumber = 0;
-			}
-		}
-	pros::lcd::print(2, "intake:%2f:",intake.get_actual_velocity());
 
 
-
-	if (master.get_digital(DIGITAL_R1)) {
-      intake.move_velocity(600); // This is 600 because it's a 600rpm motor
-	}
-	else if (master.get_digital(DIGITAL_A)) {
-      intake.move_velocity(-600); // This is 600 because it's a 600rpm motor
-	}
-	else {
-      intake.move_velocity(0);
-	}
 
 
 
 
 	if (master.get_digital(DIGITAL_L1)) {
-			target =18700;
+			target =19600;
+            readyscoreposition = 1;
+            normalposition = 0;  
 	}	
 	else if (master.get_digital(DIGITAL_L2)) {
-			target =6675;
-
+			target =7200;
+            readyscoreposition = 0;
+            normalposition = 1;
 	}	
-	else if (master.get_digital(DIGITAL_DOWN)) {
-			target =10000;
+	else if (readyscoreposition == 1) {
+			target =18500;
 	}	
-	else if (master.get_digital(DIGITAL_LEFT)) {
-			target =17500;
-	}	
-
-	else{
-			target =3900;
+	else if (normalposition == 1) {
+			target =4300;
 	}
-	float kP= 0.02;
-	float kD= 0.03;
+
+
+	float kP= 0.01;
+	float kD= 0.04;
 	int distance = target - armrotationsensor.get_angle();
 	int derivative = distance - prevdistance;
 	int armmovespeed = distance*kP+kD*derivative;
-	armmotorgroup.move_velocity(armmovespeed);
+	armmotor.move_velocity(armmovespeed);
 	int prevdistance = distance;
     pros::delay(2);
 	
