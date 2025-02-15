@@ -11,7 +11,7 @@
 #include "pros/motors.hpp"
 #include "pros/rtos.hpp"
 #include "pros/apix.h"
-
+#include "lemlib-tarball/api.hpp"
 
 int readyscoreposition = 0;
 int normalposition = 1;
@@ -158,7 +158,8 @@ ASSET(example_txt); // '.' replaced with "_" to make c++ happy
 // "." is replaced with "_" to overcome c++ limitations
 ASSET(Skillsauton1_txt);
 
-
+// Create the decoder
+lemlib_tarball::Decoder decoder(Skillsauton1_txt);
 
 
 /**
@@ -179,153 +180,11 @@ ASSET(Skillsauton1_txt);
  */
 
 void autonomous() {
-	pros::adi::DigitalOut mobilegoalmech('A');
-
-  // Set initial robot pose (x, y, heading), start intake, and release mobile goal
-  chassis.setPose(-60, 0, 90);
-  intake.move(127);
-  mobilegoalmech.set_value(true);
-
-  pros::delay(500);
-
-  //Move to center and stop second stage
-  chassis.moveToPose(-48, 0, 180, 10000, {.maxSpeed = 75});
-  intake.move(0);
-  pros::delay(500);
-  
-  //Move to Goal 1 and Clamp
-  chassis.moveToPose(-48, 24, 180, 10000, {.forwards = false});
-  pros::delay(3000);
-  mobilegoalmech.set_value(false);
-  pros::delay(1000);
-
-  //turn to face ring 1
-  chassis.turnToHeading(90, 10000, {.maxSpeed = 75});
-  pros::delay(500);
-
-  //start intake and pickup ring 1
-  intake.move(127);
-  chassis.moveToPose(-24, 24, 45, 10000, {.forwards = true, .maxSpeed = 75});
-  pros::delay(500);
-
-
-  //go to location to not hit ladder when picking up ring 2
-  chassis.moveToPose(0, 48, 45, 10000, {.maxSpeed = 75});
-  pros::delay(500);
-
-
-  //pickup ring 2
-  chassis.moveToPose(24, 53, 45, 10000, {.minSpeed = 25});
-  pros::delay(500);
-
-
-  //turn to face ring 3, 4, and 5
-  chassis.turnToHeading(270, 10000, {.maxSpeed = 75});
-  pros::delay(500);
-
-
-
-  //pickup ring 3, 4, and 5
-  chassis.moveToPose(-58, 48, 270, 10000, {.maxSpeed = 50});
-  pros::delay(500);
-
-
-  //wall reset
-  chassis.moveToPose(-70, 48, 270, 10000, {.maxSpeed = 75});
-  pros::delay(500);
-  chassis.setPose(-62.5, 48, 270);
-  pros::delay(500);
-
-
-  //back up off wall
-  chassis.moveToPose(-58, 48, 270, 10000, {.forwards = false, .maxSpeed = 75});
-  pros::delay(500);
-
-
-  //turn to align to corner
-  chassis.turnToHeading(45, 10000, {.maxSpeed = 75});
-  pros::delay(500);
-
-  //align to corner
-  chassis.moveToPose(-45, 61, 90, 10000, {.forwards = true});
-  pros::delay(500);
-
-
-  //move into corner
-  chassis.moveToPose(-59, 61, 90, 10000, {.forwards = false, .maxSpeed = 75});
-  pros::delay(500);
-
-
-  //drop goal and reverse second stage of intake slowly
-  mobilegoalmech.set_value(true);
-  intake.move(-21);
-  pros::delay(500);
-
-  //drop goal and reverse second stage of intake slowly
-  chassis.moveToPose(-46, 61, 0, 10000, {.forwards = true, .maxSpeed = 75});
-  pros::delay(500);
-
-  //drop goal and reverse second stage of intake slowly
-  chassis.moveToPose(-46, -24, 0, 10000, {.forwards = false, .maxSpeed = 75});
-  pros::delay(500);
-  pros::delay(3000);
-  mobilegoalmech.set_value(false);
-  pros::delay(1000);
-  chassis.turnToHeading(90, 10000, {.maxSpeed = 75});
-
-  //go to location to not hit ladder when picking up ring 2
-  chassis.moveToPose(0, -48, 45, 10000, {.maxSpeed = 75});
-  pros::delay(500);
-  intake.move(127);
-
-
-
-  //pickup ring 2
-  chassis.moveToPose(24, -53, 45, 10000, {.minSpeed = 25});
-  pros::delay(500);
-
-
-  //turn to face ring 3, 4, and 5
-  chassis.turnToHeading(270, 10000, {.maxSpeed = 75});
-  pros::delay(500);
-
-
-
-  //pickup ring 3, 4, and 5
-  chassis.moveToPose(-58, -48, 270, 10000, {.maxSpeed = 50});
-  pros::delay(500);
-
-    //wall reset
-  chassis.moveToPose(-70, -48, 270, 10000, {.maxSpeed = 75});
-  pros::delay(500);
-  chassis.setPose(-62.5, 48, 270);
-  pros::delay(500);
-
-
-  //back up off wall
-  chassis.moveToPose(-58, -48, 270, 10000, {.forwards = false, .maxSpeed = 75});
-  pros::delay(500);
-
-
-  //turn to align to corner
-  chassis.turnToHeading(315, 10000, {.maxSpeed = 75});
-  pros::delay(500);
-
-  //align to corner
-  chassis.moveToPose(-45, -61, 90, 10000, {.forwards = true});
-  pros::delay(500);
-
-
-  //move into corner
-  chassis.moveToPose(-59, -61, 90, 10000, {.forwards = false, .maxSpeed = 75});
-  pros::delay(500);
-
-
-  //drop goal and reverse second stage of intake slowly
-  mobilegoalmech.set_value(true);
-  intake.move(-21);
-  pros::delay(500);
-
+  // Set initial robot pose (x, y, heading)
+  chassis.setPose(0, 0, 0);
+  // Follow paths by their names from PATH.JERRYIO
+  // Parameters: path, lookahead distance, timeout
+  chassis.follow(decoder["Path 1"], 15, 2000);
 
 
 }
