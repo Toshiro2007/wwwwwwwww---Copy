@@ -2,6 +2,11 @@
 #include "lemlib/chassis/trackingWheel.hpp"
 #include "pros/optical.hpp"
 #include <algorithm>
+#include "lemlib-tarball/api.hpp"
+
+
+
+
 int righttpistonnumber = 0;
 #include "main.h"
 #include "lemlib/api.hpp" // IWYU pragma: keep
@@ -12,6 +17,15 @@ int righttpistonnumber = 0;
 #include "pros/motors.hpp"
 #include "pros/rtos.hpp"
 #include "pros/apix.h"
+
+
+
+
+
+
+
+
+
 bool reversing = false;    // Track if the motor is currently reversing
 bool spin_up_grace = true; // Grace period flag to allow for "spooling", when the motor starts spinning the first time
 
@@ -24,7 +38,7 @@ int target = 0;
 // controller
 // controller
 pros::Controller master (CONTROLLER_MASTER);
-pros::MotorGroup intake ({19, 18}, pros::MotorGearset::blue);
+pros::MotorGroup intake ({19, -18}, pros::MotorGearset::blue);
 pros::Motor armmotorgroup (17, pros::MotorGearset::green);
 
 // motor groupss
@@ -32,7 +46,7 @@ pros::MotorGroup left_motors({-1, -2, 3}, pros::MotorGearset::blue); // left mot
 pros::MotorGroup right_motors({11, 12, -13}, pros::MotorGearset::blue); // left motors use 600 RPM cartridges
 
 // Inertial Sensor on port 10
-pros::Imu imu(4);
+pros::Imu imu(8);
 pros::Rotation armrotationsensor(16);
 
 
@@ -88,9 +102,9 @@ lemlib::ControllerSettings angularController(2, // proportional gain (kP)
 );
 
 // sensors for odometry
-lemlib::OdomSensors sensors(&vertical, // vertical tracking wheel
+lemlib::OdomSensors sensors(nullptr, // vertical tracking wheel
                             nullptr, // vertical tracking wheel 2, set to nullptr as we don't have a second one
-                            &horizontal, // horizontal tracking wheel
+                            nullptr, // horizontal tracking wheel
                             nullptr, // horizontal tracking wheel 2, set to nullptr as we don't have a second one
                             &imu // inertial sensor
 );
@@ -180,7 +194,161 @@ ASSET(example_txt); // '.' replaced with "_" to make c++ happy
  * from where it left off.
  */
 void autonomous() {
+
+pros::Motor armmotorgroup(17, pros::MotorGearset::green);
+pros::adi::DigitalOut mobilegoal('A');
+mobilegoal.set_value(true);
+intake.move(127);
+
+int target = 12000;
+int distance = 10000;
+int prevdistance = distance;  // Initialize prevdistance before the loop
+
+// Start loop to move the arm until it reaches the target
+while (distance > 500) {  // Continue until distance is less than or equal to 10
+    float kP = 0.02;
+    float kD = 0.03;
+    
+    distance = target - armrotationsensor.get_angle();  // Calculate the current distance from target
+    int derivative = distance - prevdistance;  // Calculate the difference in distance (derivative)
+
+    int armmovespeed = distance * kP + kD * derivative;  // Calculate motor speed using PD control
+
+    armmotorgroup.move_velocity(armmovespeed);  // Set motor speed to move the arm
+
+    prevdistance = distance;  // Update prevdistance for next iteration
+
+    pros::delay(2);  // Delay for motor response time
+}
+
+
+
+target =0;
+
+distance = 100;{
+while (distance < 10);			
+	float kP= 0.02;
+	float kD= 0.03;
+	distance = target - armrotationsensor.get_angle();
+	int derivative = distance - prevdistance;
+	int armmovespeed = distance*kP+kD*derivative;
+	armmotorgroup.move_velocity(armmovespeed);
+	int prevdistance = distance;
+	pros::delay(2);
+}
+
+
+
+// Once the arm is in position (distance <= 10), set the chassis pose
+
+// Move the chassis to a specific point
+
+
+
+chassis.moveToPoint(0, -11, 1000, {.forwards = false, .maxSpeed = 50, .minSpeed = 60, .earlyExitRange = 2});
+chassis.turnToHeading(90, 1000, {.maxSpeed = 50});
+chassis.moveToPoint(-22, -11, 1000, {.forwards = false, .maxSpeed = 50, .minSpeed = 60, .earlyExitRange = 2});
+pros::delay(1000);  // Delay for motor response time
+mobilegoal.set_value(false);
+pros::delay(1000);  // Delay for motor response time
+
+chassis.setPose(0, 0, 0);
+
+chassis.turnToHeading(90, 1000, {.maxSpeed = 50});
+chassis.setPose(0, 0, 0);
+pros::delay(1000);  // Delay for motor response time
+
+chassis.moveToPoint(20, 0, 1000, {.forwards = true, .maxSpeed = 50, .minSpeed = 60, .earlyExitRange = 2});
+pros::delay(1000);  // Delay for motor response time
+chassis.setPose(0, 0, 0);
+pros::delay(1000);  // Delay for motor response time
+
+
+pros::delay(1000);  // Delay for motor response time
+
+chassis.turnToHeading(90, 1000, {.maxSpeed = 50});
+
+pros::delay(1000);  // Delay for motor response time
+
+chassis.setPose(0, 0, 0);
+
+pros::delay(1000);  // Delay for motor response time
+
+
+
+chassis.moveToPoint(0, 16, 2000, {.forwards = true, .maxSpeed = 50, .minSpeed = 60, .earlyExitRange = 2});
+
+pros::delay(3000);  // Delay for motor response time
+
+chassis.turnToHeading(90, 1000, {.maxSpeed = 50});
+
+
+pros::delay(1000);  // Delay for motor response time
+chassis.setPose(0, 0, 0);
+pros::delay(1000);  // Delay for motor response time
+
+chassis.moveToPoint(0, 34, 3000, {.forwards = true, .maxSpeed = 50, .minSpeed = 60, .earlyExitRange = 2});
+pros::delay(1000);  // Delay for motor response time
+chassis.setPose(0, 0, 0);
+pros::delay(1000);  // Delay for motor response time
+chassis.setPose(0, 0, 0);
+
+
+pros::delay(1000);  // Delay for motor response time
+chassis.turnToHeading(135, 1000, {.maxSpeed = 50});
+
+pros::delay(1000);  // Delay for motor response time
+chassis.setPose(0, 0, 0);
+pros::delay(2000);  // Delay for motor response time
+
+mobilegoal.set_value(true);
+pros::delay(2000);  // Delay for motor response time
+
+chassis.moveToPoint(0, -16, 2000, {.forwards = false, .maxSpeed = 50, .minSpeed = 60, .earlyExitRange = 2});
+
+pros::delay(2000);  // Delay for motor response time
+
+chassis.moveToPoint(0, 25, 3000, {.forwards = true, .maxSpeed = 50, .minSpeed = 60, .earlyExitRange = 2});
+pros::delay(4000);  // Delay for motor response time
+
+
+chassis.setPose(0, 0, 0);
+chassis.turnToHeading(180, 4000, {.maxSpeed = 50});
+
+pros::delay(5000);  // Delay for motor response time
+chassis.setPose(0, 0, 0);
+
+chassis.moveToPoint(0, -37, 2000, {.forwards = false, .maxSpeed = 50, .minSpeed = 60, .earlyExitRange = 2});
+pros::delay(2000);  // Delay for motor response time
+chassis.turnToHeading(90, 4000, {.maxSpeed = 50});
+chassis.moveToPoint(0, -13, 2000, {.forwards = false, .maxSpeed = 50, .minSpeed = 60, .earlyExitRange = 2});
+
+pros::delay(2000);  // Delay for motor response time
+mobilegoal.set_value(false);
+pros::delay(4000);  // Delay for motor response time
+
+chassis.setPose(0, 0, 0);
+chassis.turnToHeading(180, 4000, {.maxSpeed = 50});
+pros::delay(5000);  // Delay for motor response time
+
+chassis.setPose(0, 0, 0);
+chassis.moveToPoint(0, 20, 3000, {.forwards = true, .maxSpeed = 50, .minSpeed = 60, .earlyExitRange = 2});
+pros::delay(4000);  // Delay for motor response time
+chassis.setPose(0, 0, 0);
+
+chassis.turnToHeading(90, 1000, {.direction = AngularDirection::CW_CLOCKWISE, .minSpeed = 100});
+pros::delay(2000);  // Delay for motor response time
+chassis.setPose(0, 0, 0);
+chassis.moveToPoint(0, -12, 3000, {.forwards = false, .maxSpeed = 50, .minSpeed = 60, .earlyExitRange = 2});
+
+
+}
+/**
+
+
+
 	pros::adi::DigitalOut mobilegoal('A');
+    mobilegoal.set_value(true);
 
     chassis.setPose(51, -58, 90);
     chassis.moveToPoint(23.5, -58, 1000, {.forwards = false, .maxSpeed = 100, .minSpeed = 60, .earlyExitRange = 2});
@@ -188,12 +356,12 @@ void autonomous() {
     chassis.moveToPoint(4, -48.5, 1450, {.forwards = false, .maxSpeed = 50});
     chassis.waitUntilDone();
     intake.move(127);
-    mobilegoal.set_value(true);
+    mobilegoal.set_value(false);
     pros::delay(200); //delay for clamp
     chassis.turnToPoint(4.5, -22, 700, {.forwards=false});
     chassis.moveToPoint(4.5, -22, 1500, {.forwards=false});
     pros::delay(700);
-    mobilegoal.set_value(false);
+    mobilegoal.set_value(true);
     pros::delay(200);
     chassis.moveToPoint(4.5, -30, 1500);
     chassis.waitUntilDone();
@@ -215,196 +383,6 @@ void autonomous() {
  * task, not resume it from where it left off.
  */
 
-
-
-
-
-/** 
- * @brief Desired velocity for the intake motor in RPM.
- */
-const int desired_velocity = 700;
-
-/** 
- * @brief Threshold velocity below which the motor is considered stuck.
- * @details If the motor's velocity falls below this value, corrective action will be taken.
- */
-const int velocity_threshold = 50;
-
-/** 
- * @brief Degrees to reverse the intake motor when it is stuck.
- */
-const int reverse_degrees = 3390;
-
-/** 
- * @brief Speed for reversing the intake motor.
- */
-const int reverse_speed = -600;
-
-/**
- * @brief Task function that monitors the intake motor for stalls and takes corrective action.
- *
- * This task continuously checks the velocity of the intake motor. If the velocity falls below
- * the defined threshold while the motor is supposed to be running, it assumes the motor is stuck.
- * To resolve this, the motor is reversed for a certain number of degrees before resuming
- * normal operation.
- *
- * @param param Pointer to additional data passed to the task (not used here, can be nullptr).
- */
-
-void intake_monitor_task_function(void *param)
-{
-    bool reversing = false;    // Track if the motor is currently reversing
-    bool spin_up_grace = true; // Grace period flag to allow for "spooling", when the motor starts spinning the first time
-
-    while (true)
-    {
-        // Get the current velocity of the intake motor
-        double current_velocity = intake.get_actual_velocity();
-
-        // Allow a grace period for spin-up after the motor starts
-        if (spin_up_grace)
-        {
-            pros::delay(200);      // 200ms delay for spin-up
-            spin_up_grace = false; // Disable grace period after initial delay
-            continue;              // Skip the stuck check during grace period
-        }
-
-        // Check if the intake motor is stuck
-        if (!reversing && abs(current_velocity) < velocity_threshold && intake.get_target_velocity() != 0)
-        {
-            // Log a message to the LCD for debugging purposes
-            pros::lcd::print(0, "Intake stuck! Reversing...");
-            pros::lcd::print(2, "Current velocity: %.2f", current_velocity);
-
-            // Reverse the intake motor to resolve the stall
-            reversing = true; // Set reversing flag to avoid repeated reversals
-            intake.move_relative(-reverse_degrees, reverse_speed);
-
-            // Wait for the reverse motion to complete
-            while (abs(intake.get_actual_velocity()) > 1)
-            {
-                pros::delay(10);
-            }
-
-            // Resume normal intake operation
-            intake.move_velocity(desired_velocity);
-            reversing = false; // Reset the reversing flag
-        }
-
-        // Delay to reduce CPU usage of the task
-        pros::delay(20);
-    }
-}
-
-
-
-
-
-/**
- * @brief Enumeration of alliance colors.
- * Used to determine the robot's team color and apply related logic.
- */
-
-enum AllianceColor
-{
-    RED,
-    BLUE,
-    UNKNOWN
-};
-
-/**
- * @brief Global variable representing the current alliance color.
- * Initialized to red by default, but can be changed to blue if needed.`
- * Suggest having your autonomous routines automatically set the ALLIANCE_COLOR
- */
-AllianceColor ALLIANCE_COLOR = RED;
-
-
-
-
-/**
- * @brief Detects the color using the colorSortSensor.
- *
- * Uses the hue reading to determine if the detected color is RED, BLUE, or UNKNOWN.
- *
- * @return AllianceColor The detected color as an AllianceColor enum value.
- */
-AllianceColor detectColor()
-{
-    int hue = colorSortSensor.get_hue();
-
-    if (hue >= 330 || hue <= 30)
-    {
-        return RED;
-    }
-    else if (hue >= 210 && hue <= 270)
-    {
-        return BLUE;
-    }
-    else
-    {
-        return UNKNOWN; // Define UNKNOWN in your enum if needed
-    }
-}
-
-
-/**
- * @brief Task function to handle color sorting logic.
- *
- * This function continuously monitors objects detected by the color sorting sensor.
- * It determines whether the detected object matches the ALLIANCE_COLOR and
- * controls the intake motor to either allow or reject the object.
- * This function should be run as a separate task to avoid blocking the main loop.
- */
-void colorSortTask(void* param) 
-{
-    // Constants for motor behavior during color sorting
-    constexpr int TRAVEL_DELAY = 100; // Delay (ms) before stopping to eject
-    constexpr int STOP_DELAY = 200;   // Delay (ms) to ensure ejection
-    constexpr int INTAKE_SPEED = 100; // Default motor speed for intake
-
-    while (true)
-    {
-        // Detect the current color of the object using the sensor
-        AllianceColor detectedColor = detectColor();
-
-        // Scenario 1: Detected color matches the alliance color
-        if (detectedColor == ALLIANCE_COLOR)
-        {
-            // Display a message indicating a color match
-            master.set_text(2, 0, "Color Match!");
-            // Intake motor continues to operate normally
-        }
-        // Scenario 2: Detected color does not match the alliance color
-        else if (detectedColor != UNKNOWN)
-        {
-            // Brief delay to allow the object to reach the eject position
-            pros::delay(TRAVEL_DELAY);
-
-            // Stop the intake motor momentarily to eject the object
-            intake.move_velocity(0);
-
-            // Display a message indicating a color mismatch
-            master.set_text(2, 0, "Color Mismatch!");
-
-            // Allow time for the object to be ejected via inertia
-            pros::delay(STOP_DELAY);
-
-            // Resume normal intake motor operation
-            intake.move_velocity(INTAKE_SPEED);
-        }
-        // Scenario 3: No object is detected by the sensor
-        else
-        {
-            // Display a message indicating that no object is detected
-            master.set_text(2, 0, "No Ring!");
-            // No changes to the intake motor state; remains under external control
-        }
-
-        // Add a small delay to prevent excessive sensor polling or spamming messages
-        pros::delay(50);
-    }
-}
 
 
 
@@ -436,7 +414,6 @@ void opcontrol() {
 
    	// Start the color sorting task
 
-    pros::Task colorSort(colorSortTask, nullptr, "Intake Monitor Task");
 
 	while (true) {
 
@@ -444,33 +421,8 @@ void opcontrol() {
 
 
 	// Check if the R1 button on the controller is pressed
-	if (master.get_digital(DIGITAL_R1))
-	{
-		// Run the intake motor at the desired velocity
-		intake.move_velocity(desired_velocity);
-
-		// Start the intake monitoring task if not already running
-		if (intake_monitor_task == nullptr)
-		{
-			intake_monitor_task = new pros::Task(intake_monitor_task_function, nullptr, "Intake Monitor Task");
-		}
-	}
-	else
-	{
-		// Stop the intake motor
-		intake.move_velocity(0);
-
-		// Stop and destroy the intake monitoring task if running
-		if (intake_monitor_task != nullptr)
-		{
-			intake_monitor_task->remove(); // Stop the task
-			delete intake_monitor_task;    // Free the allocated memory
-			intake_monitor_task = nullptr;
-		}
-	}
-
-
-
+	if (master.get_digital(DIGITAL_R1))		
+        intake.move(127);
 
 
 
@@ -566,10 +518,10 @@ void opcontrol() {
 
 
 	if (master.get_digital(DIGITAL_L1)) {
-			target =18500;
+			target =18700;
 	}	
 	else if (master.get_digital(DIGITAL_L2)) {
-			target =6700;
+			target =6675;
 
 	}	
 	else if (master.get_digital(DIGITAL_DOWN)) {
