@@ -15,6 +15,7 @@
 
 int readyscoreposition = 0;
 int normalposition = 1;
+int mobileflippernum = 0;
 
 
 
@@ -181,10 +182,10 @@ lemlib_tarball::Decoder decoder(Skillsauton1_txt);
 
 void autonomous() {
   // Set initial robot pose (x, y, heading)
-  chassis.setPose(0, 0, 0);
+  chassis.setPose(-160, 0, 90);
   // Follow paths by their names from PATH.JERRYIO
   // Parameters: path, lookahead distance, timeout
-  chassis.follow(decoder["Path 1"], 15, 2000);
+  chassis.follow(decoder["Path 1"], 15, 100000);
 
 
 }
@@ -219,6 +220,7 @@ void opcontrol() {
 	pros::adi::DigitalOut mobilegoalmech('A');
 	pros::adi::DigitalOut doinker('D');
 	pros::adi::DigitalOut intakeraiser('E');
+	pros::adi::DigitalOut mobileflipper('C');
 
     
 
@@ -282,6 +284,15 @@ void opcontrol() {
 	
 
 
+	if (master.get_digital_new_press(DIGITAL_B))
+    if (mobileflippernum == 1){
+		  mobileflipper.set_value(true);
+      mobileflippernum = 0;
+		}
+    else {
+		  mobileflipper.set_value(false);
+      mobileflippernum = 1;
+    }
 
 
 
