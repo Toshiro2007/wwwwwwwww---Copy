@@ -15,17 +15,24 @@
 
 int readyscoreposition = 0;
 int normalposition = 1;
-int mobileflippernum = 0;
-
+int doinkernum = 1;
+int intakeraisernum = 1;
 
 
 
 
 int prevdistance = 0;
 int target = 0;
+
+
+pros::Controller master(pros::E_CONTROLLER_MASTER);
+pros::adi::DigitalOut mobilegoalmech('A');
+pros::adi::DigitalOut doinker('B');
+pros::adi::DigitalOut intakeraiser('D');
+pros::adi::DigitalOut mobileflipper('C');
+
 // controller
 // controller
-pros::Controller master (CONTROLLER_MASTER);
 pros::MotorGroup intake ({19, -18}, pros::MotorGearset::blue);
 pros::MotorGroup intakepreroller ({19, -18}, pros::MotorGearset::blue);
 pros::Motor armmotor (17, pros::MotorGearset::green);
@@ -100,12 +107,275 @@ lemlib::ExpoDriveCurve steerCurve(3, // joystick deadband out of 127
 // create the chassis
 lemlib::Chassis chassis(drivetrain, linearController, angularController, sensors, &throttleCurve, &steerCurve);
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+bool sort_red = false;
+bool is_red = true;
+
+
+void Match_Sort(){
+    // if(IntakeMotor.get_actual_velocity()>140){
+    // Initial_delay = 7;
+    // }
+    // else if(IntakeMotor.get_actual_velocity()<140){
+    // Initial_delay = 10;
+    // }
+    // Initial_delay = 980/IntakeMotor.get_actual_velocity()/(2)-7;
+    pros::delay(65); //Delay to tune break point
+    intake.move_voltage(-12000);
+    pros::delay(100); //Delay to control length of break period
+    intake.move_voltage(12000);
+}
+
+void Intake(){
+    while (true){
+        is_red = true;
+        //If button R1 is being pressed, spin teh intake forwards at full speed
+        if (master.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) {
+        intake.move_voltage(12000);
+        }
+        else if (!(master.get_digital(pros::E_CONTROLLER_DIGITAL_L1))) {
+        intake.move_voltage(0);
+        }
+        //If button "Y" is pressed: Sets intake to sort opposite color of the previous sort color
+        // if(controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_LEFT)) {
+        //     sort_red = !sort_red;   
+        // }
+
+        //     if ((Ring_Optical.get_hue()<13)){
+        //         is_red = true;
+        //     }
+        //     if ((Ring_Optical.get_hue() < 260) & (Ring_Optical.get_hue() > 215)){
+        //         is_red = false;
+        //     }
+            // if(get_opticalColor() == 3){
+            //     //Sort Blue
+            //     if ((Ring_Distance.get() < 25)){
+            //     target_position = 40;  
+            //     } 
+            //     if ((Ring_Distance.get() < 10)){
+            //     Match_Sort();  
+            //     }   
+            // }
+
+            // if (target_position > 0 & target_position < 6){
+            //     if (IntakeMotor.get)
+            // }
+
+    // printf("my int: %d\n", Initial_delay);
+
+    pros::delay(11);
+    }
+}
+
+// Get color without delay
+static int get_opticalColor() {
+    double hue = colorSortSensor.get_hue();
+    if (colorSortSensor.get_proximity() < 100) return 1; //none //IMPORTANT: was set to 100 for autons
+    if (hue < 10 || hue > 355) return 2; //red
+        master.set_text(2, 0, "Color Match!");
+
+    if (hue > 200 && hue < 240) return 3; //blue
+        master.set_text(2, 0, "Color No Match!");
+
+    return 1;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /**
  * A callback function for LLEMU's center button.
  *
  * When this callback is fired, it will toggle line 2 of the LCD text between
  * "I was pressed!" and nothing.
  */
+ 
 void on_center_button() {
 	static bool pressed = false;
 	pressed = !pressed;
@@ -128,6 +398,16 @@ void initialize() {
 	pros::lcd::initialize();
 
 	pros::lcd::register_btn1_cb(on_center_button);
+
+
+
+
+    colorSortSensor.set_integration_time(3);
+    colorSortSensor.set_led_pwm(100);
+
+
+
+
 }
 
 /**
@@ -181,14 +461,116 @@ lemlib_tarball::Decoder decoder(Skillsauton1_txt);
  */
 
 void autonomous() {
-  // Set initial robot pose (x, y, heading)
-  chassis.setPose(-160, 0, 90);
-  // Follow paths by their names from PATH.JERRYIO
-  // Parameters: path, lookahead distance, timeout
-  chassis.follow(decoder["Path 1"], 15, 100000);
 
 
+
+
+
+
+     chassis.setPose(-55, 0, 270);
+     mobilegoalmech.set_value(true);
+
+//     //Score Alliance Stake
+
+//     target_position = 120; //Score wall Stake
+       pros::delay(500);
+//     //Grab First Mobile goal
+       chassis.moveToPoint(-48, 0, 2000,{.maxSpeed = 30});
+       chassis.turnToPoint(-48, 24, 2000, {.forwards = false, .direction = AngularDirection::CCW_COUNTERCLOCKWISE}); //Aim mogo
+       chassis.moveToPoint(-48, 24, 4000, {.forwards = false, .maxSpeed = 30});
+       chassis.waitUntilDone();
+
+       mobilegoalmech.set_value(false);
+
+//     //First Ring
+       intake.move_voltage(12000);
+       chassis.turnToPoint(-24, 24, 2000, {.direction = AngularDirection::CCW_COUNTERCLOCKWISE, .maxSpeed = 30});
+       chassis.moveToPoint(-24, 24, 4000,{.maxSpeed = 30});
+       //Second Ring
+       chassis.turnToPoint(-24, 48, 2000, {.direction = AngularDirection::CCW_COUNTERCLOCKWISE, .maxSpeed = 30});
+       chassis.moveToPoint(-24, 48, 4000,{.maxSpeed = 30});
+       //3rd-4th Ring
+       chassis.moveToPoint(-60, 48, 4000,{.maxSpeed = 30});
+       //5th Ring
+       chassis.turnToPoint(-48, 48, 2000, {.direction = AngularDirection::CCW_COUNTERCLOCKWISE, .maxSpeed = 30});
+       // chassis.turnToPoint(-47.1, 58.9, 2000, {.direction = AngularDirection::CCW_COUNTERCLOCKWISE, .maxSpeed = 30}); 5th ring position
+       chassis.moveToPoint(-49.4, 51.9, 4000,{.maxSpeed = 30});
+       //Put Mogo In corner
+       chassis.turnToPoint(-64, 64, 2000, {.forwards = false, .direction = AngularDirection::CW_CLOCKWISE});
+       chassis.waitUntilDone();
+       mobilegoalmech.set_value(true);
+       chassis.moveToPoint(-59.3, 59.3, 4000, {.forwards = false, .maxSpeed = 30});
+    
+// //---------------------------------
+
+       //Grab Second Mogo
+       chassis.moveToPoint(-48, 48, 2000, {.forwards = false, .maxSpeed = 30});
+       chassis.turnToPoint(-64, -64, 2000, {.forwards = false, .direction = AngularDirection::CW_CLOCKWISE}); //Aim for corner
+       chassis.moveToPoint(-48, -24, 2000, {.forwards = false, .maxSpeed = 30});
+       chassis.waitUntilDone();
+
+       mobilegoalmech.set_value(false);
+
+       //First ring
+       chassis.turnToPoint(-24, -24, 2000, {.direction = AngularDirection::CW_CLOCKWISE, .maxSpeed = 30});
+       chassis.moveToPoint(-24, -24, 4000,{.maxSpeed = 30});
+       //Second Ring
+       chassis.turnToPoint(-24, -48, 2000, {.direction = AngularDirection::CW_CLOCKWISE, .maxSpeed = 30});
+       chassis.moveToPoint(-24, -48, 4000,{.maxSpeed = 30});
+       //3rd-4th Ring
+       chassis.turnToPoint(-48, -48, 2000, {.direction = AngularDirection::CW_CLOCKWISE, .maxSpeed = 30});
+       chassis.moveToPoint(-60, -48, 4000,{.maxSpeed = 30});
+       //5th Ring
+       // chassis.turnToPoint(-47.1, 58.9, 2000, {.direction = AngularDirection::CCW_COUNTERCLOCKWISE, .maxSpeed = 30}); 5th ring position
+       chassis.moveToPoint(-49.4, -51.9, 4000,{.maxSpeed = 30});
+       //Put Mogo In corner
+       chassis.turnToPoint(-64, 64, 2000, {.forwards = false, .direction = AngularDirection::CCW_COUNTERCLOCKWISE}); //Aim for corner
+       chassis.waitUntilDone();
+       mobilegoalmech.set_value(true);
+       chassis.moveToPoint(-59.3, -59.3, 4000,{.maxSpeed = 30});
+
+// //--------------------------------------
+
+       //Score Wall Stake
+       chassis.moveToPose(0, -48, 90, 4000,{.maxSpeed = 30});
+       chassis.waitUntilDone();
+       chassis.turnToPoint(0, -69, 2000, {.direction = AngularDirection::CW_CLOCKWISE, .maxSpeed = 30});
+       chassis.moveToPoint(0, -57, 2000,{.maxSpeed = 30});
+       chassis.waitUntilDone();
+       pros::delay(500);
+       //Grab 3rd mobile goal
+       chassis.moveToPoint(0, -43.5, 2000, {.forwards = false, .maxSpeed = 30});
+       chassis.turnToPoint(59, -24, 2000, {.forwards = false, .direction = AngularDirection::CW_CLOCKWISE});
+       chassis.moveToPoint(59, -24, 4000, {.forwards = false, .maxSpeed = 30});
+       chassis.waitUntilDone();
+
+       mobilegoalmech.set_value(false);
+       
+       //Push 3rd goal in corner
+       chassis.turnToPoint(64, -64, 2000, {.forwards = false, .direction = AngularDirection::CW_CLOCKWISE});
+       chassis.waitUntilDone();
+       mobilegoalmech.set_value(true);
+       chassis.moveToPoint(-59.3, -59.3, 4000, {.forwards = false, .maxSpeed = 30});
+       //Grab fourth goal
+       chassis.turnToPoint(36, 36, 2000, {.forwards = false, .direction = AngularDirection::CW_CLOCKWISE});
+       chassis.moveToPoint(36, 36, 5000, {.forwards = false, .maxSpeed = 30});
+       chassis.waitUntilDone();
+
+       mobilegoalmech.set_value(false);
+
+       
+       //Intake final ring
+       chassis.turnToPoint(24, 24, 2000, {.direction = AngularDirection::CW_CLOCKWISE});
+       chassis.moveToPoint(24, 24, 5000, {.maxSpeed = 30});
+       //Push 4th mobile goal in corner
+       chassis.waitUntilDone();
+       mobilegoalmech.set_value(true);
+       chassis.moveToPoint(59.3, 59.3, 5000, {.forwards = false, .maxSpeed = 30});
 }
+
+
+
+
 /**
  * Runs the operator control code. This function will be started in its own task
  * with the default priority and stack size whenever the robot is enabled via
@@ -215,12 +597,8 @@ void autonomous() {
  */
 void opcontrol() {
 
+pros::Task Sort(Intake);
 
-	pros::Controller master(pros::E_CONTROLLER_MASTER);
-	pros::adi::DigitalOut mobilegoalmech('A');
-	pros::adi::DigitalOut doinker('D');
-	pros::adi::DigitalOut intakeraiser('E');
-	pros::adi::DigitalOut mobileflipper('C');
 
     
 
@@ -282,17 +660,38 @@ void opcontrol() {
 		}
 		
 	
-
-
-	if (master.get_digital_new_press(DIGITAL_B))
-    if (mobileflippernum == 1){
-		  mobileflipper.set_value(true);
-      mobileflippernum = 0;
+	if (master.get_digital_new_press(DIGITAL_UP))
+    if (doinkernum == 1){
+		  doinker.set_value(true);
+      doinkernum = 0;
 		}
     else {
-		  mobileflipper.set_value(false);
-      mobileflippernum = 1;
+		  doinker.set_value(false);
+      doinkernum = 1;
     }
+
+
+	if (master.get_digital_new_press(DIGITAL_X))
+    if (intakeraisernum == 1){
+		  intakeraiser.set_value(true);
+      intakeraisernum = 0;
+		}
+    else {
+		  intakeraiser.set_value(false);
+      intakeraisernum = 1;
+    }
+
+
+
+
+
+
+	if (master.get_digital(DIGITAL_B)){
+		  mobileflipper.set_value(true);	
+    }
+  else {
+		  mobileflipper.set_value(false);
+  }
 
 
 
@@ -303,20 +702,20 @@ void opcontrol() {
             normalposition = 0;  
 	}	
 	else if (master.get_digital(DIGITAL_L2)) {
-			target =7200;
+			target =7450;
             readyscoreposition = 0;
             normalposition = 1;
 	}	
 	else if (readyscoreposition == 1) {
-			target =18500;
+			target =16000;
 	}	
 	else if (normalposition == 1) {
-			target =4300;
+			target =4450;
 	}
 
 
 	float kP= 0.01;
-	float kD= 0.04;
+	float kD= 0.03;
 	int distance = target - armrotationsensor.get_angle();
 	int derivative = distance - prevdistance;
 	int armmovespeed = distance*kP+kD*derivative;
