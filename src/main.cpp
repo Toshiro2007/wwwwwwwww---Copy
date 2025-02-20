@@ -17,7 +17,7 @@ int readyscoreposition = 0;
 int normalposition = 1;
 int doinkernum = 1;
 int intakeraisernum = 1;
-
+int mobileflippernum = 1;
 
 
 
@@ -33,8 +33,8 @@ pros::adi::DigitalOut mobileflipper('C');
 
 // controller
 // controller
-pros::MotorGroup intake ({19, -18}, pros::MotorGearset::blue);
-pros::MotorGroup intakepreroller ({19, -18}, pros::MotorGearset::blue);
+pros::Motor intake ({19}, pros::MotorGearset::blue);
+pros::Motor intakepreroller ({-18}, pros::MotorGearset::blue);
 pros::Motor armmotor (17, pros::MotorGearset::green);
 
 // motor groupss
@@ -192,53 +192,12 @@ lemlib::Chassis chassis(drivetrain, linearController, angularController, sensors
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 bool sort_red = false;
 bool is_red = true;
 
-
 void Match_Sort(){
+    master.set_text(2, 0, "Color Match ye!");
+
     // if(IntakeMotor.get_actual_velocity()>140){
     // Initial_delay = 7;
     // }
@@ -296,18 +255,24 @@ void Intake(){
 // Get color without delay
 static int get_opticalColor() {
     double hue = colorSortSensor.get_hue();
-    if (colorSortSensor.get_proximity() < 100) return 1; //none //IMPORTANT: was set to 100 for autons
     if (hue < 10 || hue > 355) return 2; //red
-        master.set_text(2, 0, "Color Match!");
-
     if (hue > 200 && hue < 240) return 3; //blue
-        master.set_text(2, 0, "Color No Match!");
-
-    return 1;
 }
 
 
 
+
+
+void Auton_StopIntake(){
+    while (true){
+        intake.move_voltage(12000);
+        if (get_opticalColor() == 3){ 
+               intake.brake();
+               pros::delay(2500);
+               return;
+        } 
+    }
+}
 
 
 
@@ -463,109 +428,27 @@ lemlib_tarball::Decoder decoder(Skillsauton1_txt);
 void autonomous() {
 
 
+  // Set initial robot pose (x, y, heading)
+  chassis.setPose(-63, 0, 90);
+  // Follow paths by their names from PATH.JERRYIO
+  // Parameters: path, lookahead distance, timeout
+  chassis.follow(decoder["Path 1"], 15, 20000);
+  chassis.follow(decoder["Path 2"], 15, 20000);
+  chassis.follow(decoder["Path 3"], 15, 20000);
+  chassis.follow(decoder["Path 4"], 15, 20000);
+  chassis.follow(decoder["Path 5"], 15, 20000);
+  chassis.follow(decoder["Path 6"], 15, 20000);
+  chassis.follow(decoder["Path 7"], 15, 20000);
+  chassis.follow(decoder["Path 8"], 15, 20000);
+  chassis.follow(decoder["Path 9"], 15, 20000);
+  chassis.follow(decoder["Path 10"], 15, 20000);
+  chassis.follow(decoder["Path 11"], 15, 20000);
+  chassis.follow(decoder["Path 12"], 15, 20000);
 
 
 
 
-     chassis.setPose(-55, 0, 270);
-     mobilegoalmech.set_value(true);
 
-//     //Score Alliance Stake
-
-//     target_position = 120; //Score wall Stake
-       pros::delay(500);
-//     //Grab First Mobile goal
-       chassis.moveToPoint(-48, 0, 2000,{.maxSpeed = 30});
-       chassis.turnToPoint(-48, 24, 2000, {.forwards = false, .direction = AngularDirection::CCW_COUNTERCLOCKWISE}); //Aim mogo
-       chassis.moveToPoint(-48, 24, 4000, {.forwards = false, .maxSpeed = 30});
-       chassis.waitUntilDone();
-
-       mobilegoalmech.set_value(false);
-
-//     //First Ring
-       intake.move_voltage(12000);
-       chassis.turnToPoint(-24, 24, 2000, {.direction = AngularDirection::CCW_COUNTERCLOCKWISE, .maxSpeed = 30});
-       chassis.moveToPoint(-24, 24, 4000,{.maxSpeed = 30});
-       //Second Ring
-       chassis.turnToPoint(-24, 48, 2000, {.direction = AngularDirection::CCW_COUNTERCLOCKWISE, .maxSpeed = 30});
-       chassis.moveToPoint(-24, 48, 4000,{.maxSpeed = 30});
-       //3rd-4th Ring
-       chassis.moveToPoint(-60, 48, 4000,{.maxSpeed = 30});
-       //5th Ring
-       chassis.turnToPoint(-48, 48, 2000, {.direction = AngularDirection::CCW_COUNTERCLOCKWISE, .maxSpeed = 30});
-       // chassis.turnToPoint(-47.1, 58.9, 2000, {.direction = AngularDirection::CCW_COUNTERCLOCKWISE, .maxSpeed = 30}); 5th ring position
-       chassis.moveToPoint(-49.4, 51.9, 4000,{.maxSpeed = 30});
-       //Put Mogo In corner
-       chassis.turnToPoint(-64, 64, 2000, {.forwards = false, .direction = AngularDirection::CW_CLOCKWISE});
-       chassis.waitUntilDone();
-       mobilegoalmech.set_value(true);
-       chassis.moveToPoint(-59.3, 59.3, 4000, {.forwards = false, .maxSpeed = 30});
-    
-// //---------------------------------
-
-       //Grab Second Mogo
-       chassis.moveToPoint(-48, 48, 2000, {.forwards = false, .maxSpeed = 30});
-       chassis.turnToPoint(-64, -64, 2000, {.forwards = false, .direction = AngularDirection::CW_CLOCKWISE}); //Aim for corner
-       chassis.moveToPoint(-48, -24, 2000, {.forwards = false, .maxSpeed = 30});
-       chassis.waitUntilDone();
-
-       mobilegoalmech.set_value(false);
-
-       //First ring
-       chassis.turnToPoint(-24, -24, 2000, {.direction = AngularDirection::CW_CLOCKWISE, .maxSpeed = 30});
-       chassis.moveToPoint(-24, -24, 4000,{.maxSpeed = 30});
-       //Second Ring
-       chassis.turnToPoint(-24, -48, 2000, {.direction = AngularDirection::CW_CLOCKWISE, .maxSpeed = 30});
-       chassis.moveToPoint(-24, -48, 4000,{.maxSpeed = 30});
-       //3rd-4th Ring
-       chassis.turnToPoint(-48, -48, 2000, {.direction = AngularDirection::CW_CLOCKWISE, .maxSpeed = 30});
-       chassis.moveToPoint(-60, -48, 4000,{.maxSpeed = 30});
-       //5th Ring
-       // chassis.turnToPoint(-47.1, 58.9, 2000, {.direction = AngularDirection::CCW_COUNTERCLOCKWISE, .maxSpeed = 30}); 5th ring position
-       chassis.moveToPoint(-49.4, -51.9, 4000,{.maxSpeed = 30});
-       //Put Mogo In corner
-       chassis.turnToPoint(-64, 64, 2000, {.forwards = false, .direction = AngularDirection::CCW_COUNTERCLOCKWISE}); //Aim for corner
-       chassis.waitUntilDone();
-       mobilegoalmech.set_value(true);
-       chassis.moveToPoint(-59.3, -59.3, 4000,{.maxSpeed = 30});
-
-// //--------------------------------------
-
-       //Score Wall Stake
-       chassis.moveToPose(0, -48, 90, 4000,{.maxSpeed = 30});
-       chassis.waitUntilDone();
-       chassis.turnToPoint(0, -69, 2000, {.direction = AngularDirection::CW_CLOCKWISE, .maxSpeed = 30});
-       chassis.moveToPoint(0, -57, 2000,{.maxSpeed = 30});
-       chassis.waitUntilDone();
-       pros::delay(500);
-       //Grab 3rd mobile goal
-       chassis.moveToPoint(0, -43.5, 2000, {.forwards = false, .maxSpeed = 30});
-       chassis.turnToPoint(59, -24, 2000, {.forwards = false, .direction = AngularDirection::CW_CLOCKWISE});
-       chassis.moveToPoint(59, -24, 4000, {.forwards = false, .maxSpeed = 30});
-       chassis.waitUntilDone();
-
-       mobilegoalmech.set_value(false);
-       
-       //Push 3rd goal in corner
-       chassis.turnToPoint(64, -64, 2000, {.forwards = false, .direction = AngularDirection::CW_CLOCKWISE});
-       chassis.waitUntilDone();
-       mobilegoalmech.set_value(true);
-       chassis.moveToPoint(-59.3, -59.3, 4000, {.forwards = false, .maxSpeed = 30});
-       //Grab fourth goal
-       chassis.turnToPoint(36, 36, 2000, {.forwards = false, .direction = AngularDirection::CW_CLOCKWISE});
-       chassis.moveToPoint(36, 36, 5000, {.forwards = false, .maxSpeed = 30});
-       chassis.waitUntilDone();
-
-       mobilegoalmech.set_value(false);
-
-       
-       //Intake final ring
-       chassis.turnToPoint(24, 24, 2000, {.direction = AngularDirection::CW_CLOCKWISE});
-       chassis.moveToPoint(24, 24, 5000, {.maxSpeed = 30});
-       //Push 4th mobile goal in corner
-       chassis.waitUntilDone();
-       mobilegoalmech.set_value(true);
-       chassis.moveToPoint(59.3, 59.3, 5000, {.forwards = false, .maxSpeed = 30});
 }
 
 
@@ -596,33 +479,8 @@ void autonomous() {
  * @brief Main operator control function.
  */
 void opcontrol() {
-
 pros::Task Sort(Intake);
-
-
-    
-
-	
-
-   
-
-
-
 	while (true) {
-
-
-
-
-	// Check if the R1 button on the controller is pressed
-
-
-
-
-
-
-
-
-
 	// get joystick positions
 	int leftY = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
 	int rightY = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_Y);
@@ -686,12 +544,15 @@ pros::Task Sort(Intake);
 
 
 
-	if (master.get_digital(DIGITAL_B)){
-		  mobileflipper.set_value(true);	
-    }
-  else {
+	if (master.get_digital_new_press(DIGITAL_B))
+    if (mobileflippernum == 1){
+		  mobileflipper.set_value(true);
+      mobileflippernum = 0;
+		}
+    else {
 		  mobileflipper.set_value(false);
-  }
+      mobileflippernum = 1;
+    }
 
 
 
