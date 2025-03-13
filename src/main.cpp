@@ -1,7 +1,11 @@
 #include "main.h"
 #include "lemlib/chassis/trackingWheel.hpp"
+#include "pros/abstract_motor.hpp"
 #include "pros/optical.hpp"
 #include <algorithm>
+#include <ctime>
+#include <time.h>
+#include <type_traits>
 #include "main.h"
 #include "lemlib/api.hpp" // IWYU pragma: keep
 #include "pros/misc.h"
@@ -12,16 +16,13 @@
 #include "pros/rtos.hpp"
 #include "pros/apix.h"
 #include "lemlib-tarball/api.hpp"
+#include <chrono>
 
-pros::Controller master(pros::E_CONTROLLER_MASTER);
-pros::adi::DigitalOut mobilegoalmech('A');
-pros::adi::DigitalOut doinker('B');
-pros::adi::DigitalOut intakeraiser('D');
-pros::adi::DigitalOut mobileflipper('C');
 
 
 int readyscoreposition = 0;
 int normalposition = 1;
+int loadposition = 1;
 int mobileflippernum = 1;
 int intakeraisernum = 1;
 int doinkernum = 1;
@@ -33,6 +34,7 @@ int prevdistance = 0;
 int target = 0;
 // controller
 // controller
+pros::Controller master (CONTROLLER_MASTER);
 pros::Motor intake ({18}, pros::MotorGearset::blue);
 pros::MotorGroup armmotor ({-17, 21}, pros::MotorGearset::green);
 
@@ -49,11 +51,16 @@ pros::Optical colorSortSensor(7);
 
 
 
+pros::adi::DigitalOut mobilegoalmech('A');
+pros::adi::DigitalOut doinker('B');
+pros::adi::DigitalOut intakeraiser('D');
+pros::adi::DigitalOut mobileflipper('C');
+
 
 // drivetrain settings
 lemlib::Drivetrain drivetrain(&left_motors, // left motor group
                               &right_motors, // right motor group
-                              11, // 12 inch track width
+                              11.5, // 12 inch track width
                               lemlib::Omniwheel::NEW_325, // using new 4" omnis
                               450, // drivetrain rpm is 360
                               2 // horizontal drift is 2 (for now)
@@ -62,7 +69,7 @@ lemlib::Drivetrain drivetrain(&left_motors, // left motor group
 // lateral motion controller
 lemlib::ControllerSettings linearController(10, // proportional gain (kP)
                                             0, // integral gain (kI)
-                                            3, // derivative gain (kD)
+                                            0, // derivative gain (kD)
                                             3, // anti windup
                                             1, // small error range, in inches
                                             100, // small error range timeout, in milliseconds
@@ -170,6 +177,25 @@ lemlib::Chassis chassis(drivetrain, linearController, angularController, sensors
 
 
 
+int distance = 0;
+
+
+
+void LB(){
+    
+    while (true){
+        float kP= 0.008;
+        float kD= 0.012;
+        distance = target - armrotationsensor.get_angle();
+        int derivative = distance - prevdistance;
+        int armmovespeed = distance*kP+kD*derivative;
+        armmotor.move_velocity(armmovespeed);
+        int prevdistance = distance;
+        pros::delay(5);
+
+    }
+
+}
 
 
 
@@ -178,24 +204,13 @@ lemlib::Chassis chassis(drivetrain, linearController, angularController, sensors
 
 
 
+unsigned long int start_intake_timer; 
+unsigned long int end_intake_timer; 
+unsigned long int start_autointake_timer; 
+unsigned long int end_autointake_timer; 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+bool do_sort_red;
 
 bool sort_red = false;
 bool is_red = true;
@@ -214,36 +229,82 @@ void Match_Sort(){
     intake.move_voltage(12000);
 }
 
-void Intake(){
+
+
+
+
+
+
+
+
+
+int runautointake;
+
+
+void AutoIntake(){
+    int runtimer = false;
+    start_autointake_timer = end_autointake_timer = clock();
+    do_sort_red = false;
     while (true){
+        end_autointake_timer = clock();
+        double delta_time = (double)(end_autointake_timer - start_autointake_timer)/CLOCKS_PER_SEC;
+
+        if (delta_time < 0.0) start_autointake_timer = end_autointake_timer;
+
+
         //master.set_text(2, 0, "Color Match!");
 
         is_red = true;
         //If button R1 is being pressed, spin teh intake forwards at full speed
-        if (master.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) {
+        if (runautointake == 1) {
         intake.move_voltage(12000);
+
+
+
+        if (delta_time > 0.2){
+
+            if ((intake.get_actual_velocity() <0.5) && (loadposition == 0)){
+
+                    intake.move_voltage(-12000);
+                    pros::delay(100); //Delay to control length of break period
+                    intake.move_voltage(12000);
+                    start_autointake_timer = clock();
+                    }
+            
+            }
         }
-        else if (!(master.get_digital(pros::E_CONTROLLER_DIGITAL_L1))) {
-        intake.move_voltage(0);
-        }
+        else{
+            start_autointake_timer = end_autointake_timer  = clock();
+            intake.move_voltage(0);
+
+                }
         //If button "Y" is pressed: Sets intake to sort opposite color of the previous sort color
-         if(master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_LEFT)) {
-             sort_red = !sort_red;   
-         }
+         //if(master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_LEFT)) {
+         //    do_sort_red = !do_sort_red;   
+         //}
+         int Hue = colorSortSensor.get_hue();
+         if (do_sort_red == true)
+            master.set_text(2, 0, "Sorting RED!");
+         if (do_sort_red == false)
+            master.set_text(2, 0, "Sorting BLUE!");
 
-             if ((colorSortSensor.get_hue()<13)){
+             if ((Hue<20)){
                  is_red = true;
+                 if (do_sort_red == true)
+                    intake.move_voltage(-12000);
+                    pros::delay(50); //Delay to control length of break period
              }
-             if ((colorSortSensor.get_hue() < 260) & (colorSortSensor.get_hue() > 215)){
+             if ((Hue < 260) & (Hue > 205)){
                  is_red = false;
-                 intake.move_voltage(-12000);
-                 pros::delay(50); //Delay to control length of break period
-
+                 if (do_sort_red == false){
+                    intake.move_voltage(-12000);
+                    pros::delay(50); //Delay to control length of break period
+                    }
 
              }
-             if(is_red == false){
-                 Match_Sort();  
-                 }   
+             //if(is_red == false){
+             //    Match_Sort();  
+             //    }   
              
 
             // if (target_position > 0 & target_position < 6){
@@ -252,7 +313,111 @@ void Intake(){
 
     // printf("my int: %d\n", Initial_delay);
 
-    pros::delay(11);
+    pros::delay(5);
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+void Intake(){
+    int runtimer = false;
+    start_intake_timer = clock();
+    end_intake_timer = clock();
+    while (true){
+        end_intake_timer = clock();
+        double delta_time = (double)(end_intake_timer - start_intake_timer)/CLOCKS_PER_SEC;
+
+        if (delta_time < 0) start_intake_timer = end_intake_timer;
+
+
+
+        
+        
+        
+        //master.set_text(2, 0, "Color Match!");
+
+        is_red = true;
+        //If button R1 is being pressed, spin teh intake forwards at full speed
+        if (master.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) {
+        intake.move_voltage(12000);
+
+
+
+        if (delta_time > 0.02){
+
+            if ((intake.get_actual_velocity() < .01) && (loadposition == 0)){
+
+                    intake.move_voltage(-12000);
+                    pros::delay(80); //Delay to control length of break period
+                    intake.move_voltage(12000);
+                    start_intake_timer = clock();
+                    }
+            
+            }
+        }
+        else{
+            start_intake_timer = clock();
+            end_intake_timer = clock();
+            intake.move_voltage(0);
+
+                }
+        //If button "Y" is pressed: Sets intake to sort opposite color of the previous sort color
+         if(master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_LEFT)) {
+             do_sort_red = !do_sort_red;   
+         }
+
+         if (do_sort_red == true)
+            master.set_text(2, 0, "Sorting RED!");
+         if (do_sort_red == false)
+            master.set_text(2, 0, "Sorting BLUE!");
+
+        if(colorSortSensor.get_proximity()<50){
+          int Hue = colorSortSensor.get_hue();
+        if ((Hue<20)){
+            is_red = true;
+            if (do_sort_red == true){
+            intake.move_voltage(-12000);
+                pros::delay(50); //Delay to control length of break period
+        }
+        }
+
+        if ((Hue < 260) && (Hue > 205)){
+            is_red = false;
+            if (do_sort_red == false){
+                intake.move_voltage(-12000);
+                pros::delay(50); //Delay to control length of break period
+            }
+
+        }
+        //if(is_red == false){
+        //    Match_Sort();  
+        //}   
+    }
+             
+
+            // if (target_position > 0 & target_position < 6){
+            //     if (IntakeMotor.get)
+            // }
+
+    // printf("my int: %d\n", Initial_delay);
+
+    pros::delay(5);
     }
 }
 
@@ -260,7 +425,7 @@ void Intake(){
 static int get_opticalColor() {
     double hue = colorSortSensor.get_hue();
     if (colorSortSensor.get_proximity() < 100) return 1; //none //IMPORTANT: was set to 100 for autons
-    if (hue < 10 || hue > 355) return 2; //red
+    if (hue < 22 || hue > 355) return 2; //red
         master.set_text(2, 0, "Color Match!");
 
     if (hue > 200 && hue < 240) return 3; //blue
@@ -352,7 +517,7 @@ void initialize() {
 	pros::lcd::initialize();
 
 	pros::lcd::register_btn1_cb(on_center_button);
-    colorSortSensor.set_integration_time(1);
+    colorSortSensor.set_integration_time(1.0);
     colorSortSensor.set_led_pwm(100);
 
 
@@ -386,9 +551,11 @@ ASSET(example_txt); // '.' replaced with "_" to make c++ happy
 // Replace my_paths.txt with your actual filename
 // "." is replaced with "_" to overcome c++ limitations
 ASSET(Skillsauton1_txt);
+ASSET(Skillsauton2_txt);
 
 // Create the decoder
 lemlib_tarball::Decoder decoder(Skillsauton1_txt);
+lemlib_tarball::Decoder decoder2(Skillsauton2_txt);
 
 
 /**
@@ -408,204 +575,200 @@ lemlib_tarball::Decoder decoder(Skillsauton1_txt);
  * from where it left off.
  */
 
+void autonomous() {
+
+
+  // Set initial robot pose (x, y, heading)
+  chassis.setPose(-60, 0, 90);
+  // Follow paths by their names from PATH.JERRYIO
+  // Parameters: path, lookahead distance, timeout
+
+  mobilegoalmech.set_value(true);
+  runautointake = 1;
+  pros::Task AutoIntakeStart(AutoIntake);
+  pros::delay(1000);
+  runautointake = 0;
+  //pros::Task AutoIntakeStart1(AutoIntake);
+
+  chassis.follow(decoder["Path 1"], 15, 1000);
+  chassis.waitUntilDone();
+  chassis.turnToHeading(180, 600);
+  chassis.waitUntilDone();
+
+  chassis.follow(decoder["Path 2"], 15, 3000, false);
+  chassis.waitUntilDone();
+  mobilegoalmech.set_value(false);
+  pros::delay(500);
+  chassis.waitUntilDone();
+  chassis.turnToHeading(90, 600);
+  chassis.waitUntilDone();
+  runautointake = 1;
+  //pros::Task AutoIntakeStart2(AutoIntake);
+
+  chassis.follow(decoder["Path 3"], 15, 3000);
+  chassis.waitUntilDone();
+  chassis.turnToHeading(45, 1250);
+  chassis.waitUntilDone();
+
+  chassis.follow(decoder["Path 4"], 15, 2000);
+  chassis.waitUntilDone();
+
+
+  target =9300;
+  pros::Task AutonLB(LB);
+
+  chassis.turnToHeading(0, 600);
+  chassis.waitUntilDone();
 
 
 
-    void autonomous() {
+  chassis.follow(decoder["Path 5"], 15, 2000);
+
+  chassis.waitUntilDone();
+  chassis.turnToHeading(0, 600);
+
+  chassis.waitUntilDone();
+
+  pros::delay(1000);
+  runautointake = 0;
+  //pros::Task AutoIntakeStart3(AutoIntake);
+
+  target =22000;
+
+  pros::delay(500);
+
+  chassis.follow(decoder["Path 6"], 15, 4000, false);
+  chassis.waitUntilDone();
+
+  chassis.turnToHeading(270, 600);
+  runautointake = 1;
+  //pros::Task AutoIntakeStart4(AutoIntake);
+  chassis.waitUntilDone();
+
+  target =7200;
+
+  chassis.follow(decoder["Path 7"], 15, 4000);
+  chassis.waitUntilDone();
+  pros::delay(500);
+
+  chassis.follow(decoder["Path 7.5"], 15, 2000);
+  chassis.waitUntilDone();
+
+  chassis.follow(decoder["Path 7.75"], 15, 1000, false);
+  chassis.waitUntilDone();
+
+  chassis.setPose(-59, 48, 270);
+  chassis.waitUntilDone();
+  chassis.turnToHeading(45, 600, {.maxSpeed = 75});
+
+  chassis.follow(decoder["Path 8"], 15, 3000);
+  chassis.waitUntilDone();
+  chassis.turnToHeading(90, 600, {.maxSpeed = 75});
+  chassis.waitUntilDone();
+
+  chassis.follow(decoder["Path 9"], 15, 2000, false);
+  chassis.waitUntilDone();
+  runautointake = 0;
+  //pros::Task AutoIntakeStart5(AutoIntake);
+  mobilegoalmech.set_value(true);
+  chassis.follow(decoder["Path 10"], 15, 2000);
+  chassis.waitUntilDone();
+  chassis.turnToHeading(0, 600);
+  chassis.waitUntilDone();
 
 
-        // Set initial robot pose (x, y, heading)
-        chassis.setPose(-58, 0, 90);
-        // Follow paths by their names from PATH.JERRYIO
-        // Parameters: path, lookahead distance, timeout
-      
-        mobilegoalmech.set_value(true);
-        intake.move(127);
-        pros::delay(250);
-        intake.move(0);
-      
-        chassis.follow(decoder["Path 1"], 15, 1000);
-        chassis.waitUntilDone();
-        chassis.turnToHeading(180, 600);
-        chassis.waitUntilDone();
-      
-        chassis.follow(decoder["Path 2"], 15, 3000, false);
-        chassis.waitUntilDone();
-        mobilegoalmech.set_value(false);
-        pros::delay(500);
-        chassis.waitUntilDone();
-        chassis.turnToHeading(90, 600);
-        chassis.waitUntilDone();
-        intake.move(127);
-      
-        chassis.follow(decoder["Path 3"], 15, 3000);
-        chassis.waitUntilDone();
-        chassis.turnToHeading(45, 1250);
-        chassis.waitUntilDone();
-      
-        chassis.follow(decoder["Path 4"], 15, 2000);
-        chassis.waitUntilDone();
-      
-        chassis.turnToHeading(270, 1250,{.maxSpeed = 75});
-        chassis.waitUntilDone();
-      ;
-        chassis.follow(decoder["Path 5"], 15, 3000);
-        chassis.waitUntilDone();
-        chassis.follow(decoder["Path 5.5"], 15, 3000);
-        chassis.waitUntilDone();
-      
-        chassis.turnToHeading(45, 1250);
-        chassis.waitUntilDone();
-      
-        chassis.follow(decoder["Path 6"], 15, 4000);
-        chassis.waitUntilDone();
-        chassis.turnToHeading(90, 1250);
-        chassis.waitUntilDone();
-      
-        chassis.follow(decoder["Path 7"], 15, 1000, false);
-        chassis.waitUntilDone();
-        mobilegoalmech.set_value(true);
-        intake.move(-127);
-        pros::delay(250);
-        chassis.waitUntilDone();
-      
-        chassis.follow(decoder["Path 8"], 15, 4000);
-        chassis.waitUntilDone();
-        intake.move(0);
-        chassis.turnToHeading(0, 1250);
-        chassis.waitUntilDone();
-      
-      
-        chassis.follow(decoder["Path 13"], 15, 1000);
-        chassis.waitUntilDone();
-        chassis.setPose(-45, 62, 0);
-        chassis.waitUntilDone();
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
-        chassis.follow(decoder["Path 9"], 15, 4000, false);
-        chassis.waitUntilDone();
-        mobilegoalmech.set_value(false);
-        pros::delay(500);
-        chassis.waitUntilDone();
-        chassis.turnToHeading(90, 1250);
-        chassis.waitUntilDone();
-        intake.move(127);
-        chassis.waitUntilDone();
-      
-        chassis.follow(decoder["Path 10"], 15, 4000);
-        pros::delay(250);
-        chassis.waitUntilDone();
-        chassis.turnToHeading(135, 1250);
-        chassis.waitUntilDone();
-      
-        chassis.follow(decoder["Path 11"], 15, 3000);
-        chassis.waitUntilDone();
-      
-      
-        chassis.turnToHeading(270, 1250, {.maxSpeed = 75});
-        chassis.waitUntilDone();
-      
-        chassis.follow(decoder["Path 12"], 15, 3000);
-        chassis.waitUntilDone();
-      
-        chassis.follow(decoder["Path 12.5"], 15, 4000);
-        chassis.waitUntilDone();
-      
-        chassis.setPose(-62,-48,270);
-        chassis.waitUntilDone();
-      
-        chassis.follow(decoder["Path 20"], 15, 3000, false);
-        chassis.waitUntilDone();
-        chassis.turnToHeading(135, 1250);
-        chassis.waitUntilDone();
-      
-        chassis.follow(decoder["Path 14"], 15, 3000);
-        chassis.waitUntilDone();
-        chassis.turnToHeading(90, 1250);
-        chassis.waitUntilDone();
-      
-        chassis.follow(decoder["Path 15"], 15, 3000, false);
-        chassis.waitUntilDone();
-        mobilegoalmech.set_value(true);
-        intake.move(127);
-        pros::delay(400);
-        chassis.waitUntilDone();
-        chassis.turnToHeading(45, 1250);
-        chassis.waitUntilDone();
-      
-        
-        chassis.follow(decoder["Path 16"], 15, 3000);
-        intake.move(-127);
-      
-        intake.move(0);
-      
-        chassis.waitUntilDone();
-      
-        chassis.follow(decoder["Path 17"], 15, 3000);
-        chassis.waitUntilDone();
-        intake.move(127);
-        pros::delay(250);
-        intake.move(0);
-      
-        chassis.follow(decoder["Path 18"], 15, 3000);
-        chassis.waitUntilDone();
-        chassis.turnToHeading(315, 1500);
-      
-        chassis.follow(decoder["Path 19"], 15, 3000, false);
-        chassis.waitUntilDone();
-        pros::delay(100);
-      
-        mobilegoalmech.set_value(false);
-        pros::delay(500);
-      
-        chassis.waitUntilDone();
-        chassis.turnToHeading(225, 1500);
-        chassis.waitUntilDone();
-      
-      
-        
-        chassis.follow(decoder["Path 21"], 15, 2000);
-        intake.move(127);
-      
-        chassis.waitUntilDone();
-        chassis.turnToHeading(135, 1500, {.maxSpeed = 75});
-        chassis.waitUntilDone();
-      
-      
-        chassis.follow(decoder["Path 22"], 15, 3000);
-        intake.move(127);
-        chassis.waitUntilDone();  
-        chassis.turnToHeading(315, 1500);
-      
-        chassis.follow(decoder["Path 23"], 15, 1000);
-        mobilegoalmech.set_value(true);
-        intake.move(-127);
-        intakeraiser.set_value(true);
-        chassis.waitUntilDone();  
-        chassis.turnToHeading(135, 1500);
-      
-        chassis.follow(decoder["Path 24"], 15, 2000);
-        mobilegoalmech.set_value(true);
-      
-        chassis.follow(decoder["Path 25"], 15, 2000,false);
-        chassis.waitUntilDone();  
-        chassis.turnToHeading(0, 1500);
-        chassis.waitUntilDone();  
-      
-        chassis.follow(decoder["Path 26"], 15, 5000);
-      
-      }
-      
-      
-      /**
+  chassis.follow(decoder["Path 11"], 15, 1000);
+  chassis.waitUntilDone();
+  pros::delay(500);
+
+  chassis.setPose(-40, 59, 0);
+  chassis.waitUntilDone();
+
+  chassis.follow(decoder["Path 12"], 15, 2000, false);
+  chassis.waitUntilDone();
+  chassis.follow(decoder["Path 12.5"], 15, 2000, false);
+  chassis.waitUntilDone();
+
+  mobilegoalmech.set_value(false);
+  pros::delay(500);
+
+
+  chassis.turnToHeading(90, 600);
+  chassis.waitUntilDone();
+  runautointake = 1;
+  //pros::Task AutoIntakeStart6(AutoIntake);
+
+  chassis.follow(decoder["Path 13"], 15, 3000);
+  chassis.waitUntilDone();
+  chassis.turnToHeading(135, 1250);
+  chassis.waitUntilDone();
+
+  chassis.follow(decoder["Path 14"], 15, 2000);
+  target =9300;
+  chassis.waitUntilDone();
+
+
+
+  chassis.turnToHeading(180, 1250);
+  chassis.waitUntilDone();
+
+  chassis.follow(decoder["Path 15"], 15, 2000);
+
+  chassis.waitUntilDone();
+
+  pros::delay(1000);
+  runautointake = 0;
+
+  target =22000;
+
+  pros::delay(500);
+
+  chassis.follow(decoder["Path 16"], 15, 4000, false);
+  chassis.waitUntilDone();
+
+  chassis.turnToHeading(270, 600);
+  runautointake = 1;
+  //pros::Task AutoIntakeStart8(AutoIntake);
+  chassis.waitUntilDone();
+
+  target =7200;
+
+  chassis.follow(decoder["Path 17"], 15, 4000);
+  pros::delay(500);
+
+
+  chassis.follow(decoder["Path 17.5"], 15, 2000);
+  chassis.waitUntilDone();
+
+  chassis.follow(decoder["Path 17.75"], 15, 1000, false);
+  chassis.waitUntilDone();
+
+  chassis.setPose(-59, -48, 270);
+  chassis.waitUntilDone();
+  chassis.turnToHeading(135, 600, {.maxSpeed = 75});
+
+
+
+
+  chassis.follow(decoder["Path 18"], 15, 3000);
+  chassis.waitUntilDone();
+  chassis.turnToHeading(90, 600, {.maxSpeed = 75});
+  chassis.waitUntilDone();
+
+  chassis.follow(decoder["Path 19"], 15, 2000, false);
+  chassis.waitUntilDone();
+  runautointake = 0;
+  //pros::Task AutoIntakeStart5(AutoIntake);
+  mobilegoalmech.set_value(true);
+  chassis.follow(decoder["Path 20"], 15, 2000);
+  chassis.waitUntilDone();
+  chassis.turnToHeading(0, 600);
+  chassis.waitUntilDone();
+
+
+
+}
+/**
  * Runs the operator control code. This function will be started in its own task
  * with the default priority and stack size whenever the robot is enabled via
  * the Field Management System or the VEX Competition Switch in the operator
@@ -632,10 +795,10 @@ lemlib_tarball::Decoder decoder(Skillsauton1_txt);
 void opcontrol() {
     
 
-	pros::Task Sort(Intake);
-
+	
 
    
+    pros::Task Sort(Intake);
 
 
 
@@ -678,7 +841,7 @@ void opcontrol() {
 		}
 		
 	
-    if (master.get_digital_new_press(DIGITAL_UP))
+    if (master.get_digital_new_press(DIGITAL_DOWN))
     if (doinkernum == 1){
         doinker.set_value(true);
         doinkernum = 0;
@@ -693,7 +856,7 @@ void opcontrol() {
 
 
 
-	if (master.get_digital_new_press(DIGITAL_B))
+	if (master.get_digital_new_press(DIGITAL_X))
     if (mobileflippernum == 1){
 		  mobileflipper.set_value(true);
       mobileflippernum = 0;
@@ -704,7 +867,7 @@ void opcontrol() {
     }
 
 
-	if (master.get_digital_new_press(DIGITAL_X))
+	if (master.get_digital_new_press(DIGITAL_B))
     if (intakeraisernum == 1){
         intakeraiser.set_value(true);
           intakeraisernum = 0;
@@ -720,18 +883,24 @@ void opcontrol() {
 	if (master.get_digital(DIGITAL_L1)) {
 			target =22000;
             readyscoreposition = 1;
-            normalposition = 0;  
+            normalposition = 0; 
+            loadposition = 0;
+ 
 	}	
 	else if (master.get_digital(DIGITAL_L2)) {
 			target =9300;
             readyscoreposition = 0;
             normalposition = 1;
+            loadposition = 1;
 	}	
 	else if (readyscoreposition == 1) {
 			target =18000;
+
 	}	
 	else if (normalposition == 1) {
 			target =7200;
+            loadposition = 0;
+
 	}
 
 
