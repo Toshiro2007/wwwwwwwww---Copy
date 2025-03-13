@@ -13,29 +13,28 @@
 #include "pros/apix.h"
 #include "lemlib-tarball/api.hpp"
 
-int readyscoreposition = 0;
-int normalposition = 1;
-int doinkernum = 1;
-int intakeraisernum = 1;
-int mobileflippernum = 1;
-
-
-
-int prevdistance = 0;
-int target = 0;
-
-
 pros::Controller master(pros::E_CONTROLLER_MASTER);
 pros::adi::DigitalOut mobilegoalmech('A');
 pros::adi::DigitalOut doinker('B');
 pros::adi::DigitalOut intakeraiser('D');
 pros::adi::DigitalOut mobileflipper('C');
 
+
+int readyscoreposition = 0;
+int normalposition = 1;
+int mobileflippernum = 1;
+int intakeraisernum = 1;
+int doinkernum = 1;
+
+
+
+
+int prevdistance = 0;
+int target = 0;
 // controller
 // controller
-pros::Motor intake ({19}, pros::MotorGearset::blue);
-pros::Motor intakepreroller ({-18}, pros::MotorGearset::blue);
-pros::Motor armmotor (17, pros::MotorGearset::green);
+pros::Motor intake ({18}, pros::MotorGearset::blue);
+pros::MotorGroup armmotor ({-17, 21}, pros::MotorGearset::green);
 
 // motor groupss
 pros::MotorGroup left_motors({-1, -2, 3}, pros::MotorGearset::blue); // left motors use 600 RPM cartridges
@@ -55,7 +54,7 @@ pros::Optical colorSortSensor(7);
 lemlib::Drivetrain drivetrain(&left_motors, // left motor group
                               &right_motors, // right motor group
                               11, // 12 inch track width
-                              lemlib::Omniwheel::NEW_275, // using new 4" omnis
+                              lemlib::Omniwheel::NEW_325, // using new 4" omnis
                               450, // drivetrain rpm is 360
                               2 // horizontal drift is 2 (for now)
 );
@@ -192,27 +191,33 @@ lemlib::Chassis chassis(drivetrain, linearController, angularController, sensors
 
 
 
+
+
+
+
+
+
 bool sort_red = false;
 bool is_red = true;
+int Initial_delay;
 
 void Match_Sort(){
-    master.set_text(2, 0, "Color Match ye!");
+     if(intake.get_actual_velocity()>140){
+     Initial_delay = 7;
+     }
+     else if(intake.get_actual_velocity()<140){
+     Initial_delay = 10;
+     }
+     Initial_delay = 980/intake.get_actual_velocity()/(2)-7;
+    pros::delay(95); //Delay to tune break point
 
-    // if(IntakeMotor.get_actual_velocity()>140){
-    // Initial_delay = 7;
-    // }
-    // else if(IntakeMotor.get_actual_velocity()<140){
-    // Initial_delay = 10;
-    // }
-    // Initial_delay = 980/IntakeMotor.get_actual_velocity()/(2)-7;
-    pros::delay(65); //Delay to tune break point
-    intake.move_voltage(-12000);
-    pros::delay(100); //Delay to control length of break period
     intake.move_voltage(12000);
 }
 
 void Intake(){
     while (true){
+        //master.set_text(2, 0, "Color Match!");
+
         is_red = true;
         //If button R1 is being pressed, spin teh intake forwards at full speed
         if (master.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) {
@@ -222,25 +227,24 @@ void Intake(){
         intake.move_voltage(0);
         }
         //If button "Y" is pressed: Sets intake to sort opposite color of the previous sort color
-        // if(controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_LEFT)) {
-        //     sort_red = !sort_red;   
-        // }
+         if(master.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_LEFT)) {
+             sort_red = !sort_red;   
+         }
 
-        //     if ((Ring_Optical.get_hue()<13)){
-        //         is_red = true;
-        //     }
-        //     if ((Ring_Optical.get_hue() < 260) & (Ring_Optical.get_hue() > 215)){
-        //         is_red = false;
-        //     }
-            // if(get_opticalColor() == 3){
-            //     //Sort Blue
-            //     if ((Ring_Distance.get() < 25)){
-            //     target_position = 40;  
-            //     } 
-            //     if ((Ring_Distance.get() < 10)){
-            //     Match_Sort();  
-            //     }   
-            // }
+             if ((colorSortSensor.get_hue()<13)){
+                 is_red = true;
+             }
+             if ((colorSortSensor.get_hue() < 260) & (colorSortSensor.get_hue() > 215)){
+                 is_red = false;
+                 intake.move_voltage(-12000);
+                 pros::delay(50); //Delay to control length of break period
+
+
+             }
+             if(is_red == false){
+                 Match_Sort();  
+                 }   
+             
 
             // if (target_position > 0 & target_position < 6){
             //     if (IntakeMotor.get)
@@ -255,29 +259,15 @@ void Intake(){
 // Get color without delay
 static int get_opticalColor() {
     double hue = colorSortSensor.get_hue();
+    if (colorSortSensor.get_proximity() < 100) return 1; //none //IMPORTANT: was set to 100 for autons
     if (hue < 10 || hue > 355) return 2; //red
+        master.set_text(2, 0, "Color Match!");
+
     if (hue > 200 && hue < 240) return 3; //blue
+        master.set_text(2, 0, "Color No Match!");
+
+    return 1;
 }
-
-
-
-
-
-void Auton_StopIntake(){
-    while (true){
-        intake.move_voltage(12000);
-        if (get_opticalColor() == 3){ 
-               intake.brake();
-               pros::delay(2500);
-               return;
-        } 
-    }
-}
-
-
-
-
-
 
 
 
@@ -340,7 +330,6 @@ void Auton_StopIntake(){
  * When this callback is fired, it will toggle line 2 of the LCD text between
  * "I was pressed!" and nothing.
  */
- 
 void on_center_button() {
 	static bool pressed = false;
 	pressed = !pressed;
@@ -363,14 +352,8 @@ void initialize() {
 	pros::lcd::initialize();
 
 	pros::lcd::register_btn1_cb(on_center_button);
-
-
-
-
-    colorSortSensor.set_integration_time(3);
+    colorSortSensor.set_integration_time(1);
     colorSortSensor.set_led_pwm(100);
-
-
 
 
 }
@@ -425,36 +408,204 @@ lemlib_tarball::Decoder decoder(Skillsauton1_txt);
  * from where it left off.
  */
 
-void autonomous() {
-
-
-  // Set initial robot pose (x, y, heading)
-  chassis.setPose(-63, 0, 90);
-  // Follow paths by their names from PATH.JERRYIO
-  // Parameters: path, lookahead distance, timeout
-  chassis.follow(decoder["Path 1"], 15, 20000);
-  chassis.follow(decoder["Path 2"], 15, 20000);
-  chassis.follow(decoder["Path 3"], 15, 20000);
-  chassis.follow(decoder["Path 4"], 15, 20000);
-  chassis.follow(decoder["Path 5"], 15, 20000);
-  chassis.follow(decoder["Path 6"], 15, 20000);
-  chassis.follow(decoder["Path 7"], 15, 20000);
-  chassis.follow(decoder["Path 8"], 15, 20000);
-  chassis.follow(decoder["Path 9"], 15, 20000);
-  chassis.follow(decoder["Path 10"], 15, 20000);
-  chassis.follow(decoder["Path 11"], 15, 20000);
-  chassis.follow(decoder["Path 12"], 15, 20000);
 
 
 
+    void autonomous() {
 
 
-}
-
-
-
-
-/**
+        // Set initial robot pose (x, y, heading)
+        chassis.setPose(-58, 0, 90);
+        // Follow paths by their names from PATH.JERRYIO
+        // Parameters: path, lookahead distance, timeout
+      
+        mobilegoalmech.set_value(true);
+        intake.move(127);
+        pros::delay(250);
+        intake.move(0);
+      
+        chassis.follow(decoder["Path 1"], 15, 1000);
+        chassis.waitUntilDone();
+        chassis.turnToHeading(180, 600);
+        chassis.waitUntilDone();
+      
+        chassis.follow(decoder["Path 2"], 15, 3000, false);
+        chassis.waitUntilDone();
+        mobilegoalmech.set_value(false);
+        pros::delay(500);
+        chassis.waitUntilDone();
+        chassis.turnToHeading(90, 600);
+        chassis.waitUntilDone();
+        intake.move(127);
+      
+        chassis.follow(decoder["Path 3"], 15, 3000);
+        chassis.waitUntilDone();
+        chassis.turnToHeading(45, 1250);
+        chassis.waitUntilDone();
+      
+        chassis.follow(decoder["Path 4"], 15, 2000);
+        chassis.waitUntilDone();
+      
+        chassis.turnToHeading(270, 1250,{.maxSpeed = 75});
+        chassis.waitUntilDone();
+      ;
+        chassis.follow(decoder["Path 5"], 15, 3000);
+        chassis.waitUntilDone();
+        chassis.follow(decoder["Path 5.5"], 15, 3000);
+        chassis.waitUntilDone();
+      
+        chassis.turnToHeading(45, 1250);
+        chassis.waitUntilDone();
+      
+        chassis.follow(decoder["Path 6"], 15, 4000);
+        chassis.waitUntilDone();
+        chassis.turnToHeading(90, 1250);
+        chassis.waitUntilDone();
+      
+        chassis.follow(decoder["Path 7"], 15, 1000, false);
+        chassis.waitUntilDone();
+        mobilegoalmech.set_value(true);
+        intake.move(-127);
+        pros::delay(250);
+        chassis.waitUntilDone();
+      
+        chassis.follow(decoder["Path 8"], 15, 4000);
+        chassis.waitUntilDone();
+        intake.move(0);
+        chassis.turnToHeading(0, 1250);
+        chassis.waitUntilDone();
+      
+      
+        chassis.follow(decoder["Path 13"], 15, 1000);
+        chassis.waitUntilDone();
+        chassis.setPose(-45, 62, 0);
+        chassis.waitUntilDone();
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+        chassis.follow(decoder["Path 9"], 15, 4000, false);
+        chassis.waitUntilDone();
+        mobilegoalmech.set_value(false);
+        pros::delay(500);
+        chassis.waitUntilDone();
+        chassis.turnToHeading(90, 1250);
+        chassis.waitUntilDone();
+        intake.move(127);
+        chassis.waitUntilDone();
+      
+        chassis.follow(decoder["Path 10"], 15, 4000);
+        pros::delay(250);
+        chassis.waitUntilDone();
+        chassis.turnToHeading(135, 1250);
+        chassis.waitUntilDone();
+      
+        chassis.follow(decoder["Path 11"], 15, 3000);
+        chassis.waitUntilDone();
+      
+      
+        chassis.turnToHeading(270, 1250, {.maxSpeed = 75});
+        chassis.waitUntilDone();
+      
+        chassis.follow(decoder["Path 12"], 15, 3000);
+        chassis.waitUntilDone();
+      
+        chassis.follow(decoder["Path 12.5"], 15, 4000);
+        chassis.waitUntilDone();
+      
+        chassis.setPose(-62,-48,270);
+        chassis.waitUntilDone();
+      
+        chassis.follow(decoder["Path 20"], 15, 3000, false);
+        chassis.waitUntilDone();
+        chassis.turnToHeading(135, 1250);
+        chassis.waitUntilDone();
+      
+        chassis.follow(decoder["Path 14"], 15, 3000);
+        chassis.waitUntilDone();
+        chassis.turnToHeading(90, 1250);
+        chassis.waitUntilDone();
+      
+        chassis.follow(decoder["Path 15"], 15, 3000, false);
+        chassis.waitUntilDone();
+        mobilegoalmech.set_value(true);
+        intake.move(127);
+        pros::delay(400);
+        chassis.waitUntilDone();
+        chassis.turnToHeading(45, 1250);
+        chassis.waitUntilDone();
+      
+        
+        chassis.follow(decoder["Path 16"], 15, 3000);
+        intake.move(-127);
+      
+        intake.move(0);
+      
+        chassis.waitUntilDone();
+      
+        chassis.follow(decoder["Path 17"], 15, 3000);
+        chassis.waitUntilDone();
+        intake.move(127);
+        pros::delay(250);
+        intake.move(0);
+      
+        chassis.follow(decoder["Path 18"], 15, 3000);
+        chassis.waitUntilDone();
+        chassis.turnToHeading(315, 1500);
+      
+        chassis.follow(decoder["Path 19"], 15, 3000, false);
+        chassis.waitUntilDone();
+        pros::delay(100);
+      
+        mobilegoalmech.set_value(false);
+        pros::delay(500);
+      
+        chassis.waitUntilDone();
+        chassis.turnToHeading(225, 1500);
+        chassis.waitUntilDone();
+      
+      
+        
+        chassis.follow(decoder["Path 21"], 15, 2000);
+        intake.move(127);
+      
+        chassis.waitUntilDone();
+        chassis.turnToHeading(135, 1500, {.maxSpeed = 75});
+        chassis.waitUntilDone();
+      
+      
+        chassis.follow(decoder["Path 22"], 15, 3000);
+        intake.move(127);
+        chassis.waitUntilDone();  
+        chassis.turnToHeading(315, 1500);
+      
+        chassis.follow(decoder["Path 23"], 15, 1000);
+        mobilegoalmech.set_value(true);
+        intake.move(-127);
+        intakeraiser.set_value(true);
+        chassis.waitUntilDone();  
+        chassis.turnToHeading(135, 1500);
+      
+        chassis.follow(decoder["Path 24"], 15, 2000);
+        mobilegoalmech.set_value(true);
+      
+        chassis.follow(decoder["Path 25"], 15, 2000,false);
+        chassis.waitUntilDone();  
+        chassis.turnToHeading(0, 1500);
+        chassis.waitUntilDone();  
+      
+        chassis.follow(decoder["Path 26"], 15, 5000);
+      
+      }
+      
+      
+      /**
  * Runs the operator control code. This function will be started in its own task
  * with the default priority and stack size whenever the robot is enabled via
  * the Field Management System or the VEX Competition Switch in the operator
@@ -479,31 +630,40 @@ void autonomous() {
  * @brief Main operator control function.
  */
 void opcontrol() {
-pros::Task Sort(Intake);
+    
+
+	pros::Task Sort(Intake);
+
+
+   
+
+
+
 	while (true) {
+
+
+
+
+	// Check if the R1 button on the controller is pressed
+
+
+
+
+
+
+
+
+
 	// get joystick positions
 	int leftY = master.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
 	int rightY = master.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_Y);
 	// move the chassis with curvature drive
 	chassis.tank(leftY, rightY);
 
-    if (master.get_digital(DIGITAL_R1))	{
-        intake.move(127);
-        intakepreroller.move(127);
+	if (master.get_digital(DIGITAL_A))
+    {
+        intake.move_voltage(-12000);
     }
-
-    else if (master.get_digital(DIGITAL_A)) {
-            intake.move(-127);
-        intakepreroller.move(-127);
-
-    }
-    else
-		{
-        intake.move(0);
-        intakepreroller.move(0);
-		}
-
-
 
 
 
@@ -518,29 +678,18 @@ pros::Task Sort(Intake);
 		}
 		
 	
-	if (master.get_digital_new_press(DIGITAL_UP))
+    if (master.get_digital_new_press(DIGITAL_UP))
     if (doinkernum == 1){
-		  doinker.set_value(true);
-      doinkernum = 0;
-		}
-    else {
-		  doinker.set_value(false);
-      doinkernum = 1;
-    }
+        doinker.set_value(true);
+        doinkernum = 0;
+      }
+  else {
+        doinker.set_value(false);
+        doinkernum = 1;
+  }
 
 
-	if (master.get_digital_new_press(DIGITAL_X))
-    if (intakeraisernum == 1){
-		  intakeraiser.set_value(true);
-      intakeraisernum = 0;
-		}
-    else {
-		  intakeraiser.set_value(false);
-      intakeraisernum = 1;
-    }
-
-
-
+      
 
 
 
@@ -555,28 +704,39 @@ pros::Task Sort(Intake);
     }
 
 
+	if (master.get_digital_new_press(DIGITAL_X))
+    if (intakeraisernum == 1){
+        intakeraiser.set_value(true);
+          intakeraisernum = 0;
+		}
+    else {
+        intakeraiser.set_value(false);
+          intakeraisernum = 1;
+    }
+
+
 
 
 	if (master.get_digital(DIGITAL_L1)) {
-			target =19600;
+			target =22000;
             readyscoreposition = 1;
             normalposition = 0;  
 	}	
 	else if (master.get_digital(DIGITAL_L2)) {
-			target =7450;
+			target =9300;
             readyscoreposition = 0;
             normalposition = 1;
 	}	
 	else if (readyscoreposition == 1) {
-			target =16000;
+			target =18000;
 	}	
 	else if (normalposition == 1) {
-			target =4450;
+			target =7200;
 	}
 
 
-	float kP= 0.01;
-	float kD= 0.03;
+	float kP= 0.008;
+	float kD= 0.012;
 	int distance = target - armrotationsensor.get_angle();
 	int derivative = distance - prevdistance;
 	int armmovespeed = distance*kP+kD*derivative;
