@@ -204,10 +204,10 @@ void LB(){
 
 
 
-unsigned long int start_intake_timer; 
-unsigned long int end_intake_timer; 
-unsigned long int start_autointake_timer; 
-unsigned long int end_autointake_timer; 
+unsigned long start_intake_timer; 
+unsigned long end_intake_timer; 
+unsigned long start_autointake_timer; 
+unsigned long end_autointake_timer; 
 
 
 bool do_sort_red;
@@ -261,12 +261,12 @@ void AutoIntake(){
 
 
 
-        if (delta_time > 0.2){
+        if (delta_time > 0.1){
 
-            if ((intake.get_actual_velocity() <0.5) && (loadposition == 0)){
+            if ((intake.get_actual_velocity() < 50) && (loadposition == 0)){
 
                     intake.move_voltage(-12000);
-                    pros::delay(100); //Delay to control length of break period
+                    pros::delay(200); //Delay to control length of break period
                     intake.move_voltage(12000);
                     start_autointake_timer = clock();
                     }
@@ -649,7 +649,7 @@ void autonomous() {
 
   chassis.follow(decoder["Path 7"], 15, 4000);
   chassis.waitUntilDone();
-  pros::delay(500);
+  pros::delay(250);
 
   chassis.follow(decoder["Path 7.5"], 15, 2000);
   chassis.waitUntilDone();
@@ -665,6 +665,7 @@ void autonomous() {
   chassis.waitUntilDone();
   chassis.turnToHeading(90, 600, {.maxSpeed = 75});
   chassis.waitUntilDone();
+  pros::delay(250);
 
   chassis.follow(decoder["Path 9"], 15, 2000, false);
   chassis.waitUntilDone();
@@ -690,7 +691,7 @@ void autonomous() {
   chassis.waitUntilDone();
 
   mobilegoalmech.set_value(false);
-  pros::delay(500);
+  pros::delay(250);
 
 
   chassis.turnToHeading(90, 600);
@@ -716,7 +717,7 @@ void autonomous() {
 
   chassis.waitUntilDone();
 
-  pros::delay(1000);
+  pros::delay(500);
   runautointake = 0;
 
   target =22000;
@@ -754,6 +755,7 @@ void autonomous() {
   chassis.waitUntilDone();
   chassis.turnToHeading(90, 600, {.maxSpeed = 75});
   chassis.waitUntilDone();
+  pros::delay(500);
 
   chassis.follow(decoder["Path 19"], 15, 2000, false);
   chassis.waitUntilDone();
